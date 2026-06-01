@@ -1,5 +1,6 @@
 from flask import Flask, render_template, redirect, url_for, request, flash, session
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, Usuario, Tramite, Postulante, Alerta
 from ml import clasificar_tramite, evaluar_cv
@@ -12,7 +13,16 @@ app.config['SECRET_KEY'] = 'gestimuni2024'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///gestimuni.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# ── Configuración Gmail ──────────────────────────────────────────────
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = 'pasivi22@gmail.com'
+app.config['MAIL_PASSWORD'] = 'lvvfijzzlrbqvjwc'
+app.config['MAIL_DEFAULT_SENDER'] = 'pasivi22@gmail.com'
+
 db.init_app(app)
+mail = Mail(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
@@ -51,9 +61,6 @@ def login():
             if user.rol == 'ciudadano':
                 login_user(user)
                 return redirect(url_for('dashboard'))
-            elif user.rol == 'empleado':
-                login_user(user)
-                return redirect(url_for('dashboard'))
             else:
                 flash('Usa el acceso de administrador.', 'danger')
         else:
@@ -82,13 +89,12 @@ def registro():
         return redirect(url_for('login'))
     return render_template('registro.html')
 
-# ── Login admin con PIN ──────────────────────────────────────────────
+# ── Login admin con PIN por correo ───────────────────────────────────
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
     if request.method == 'POST':
         paso = request.form.get('paso')
 
-        # Paso 1 — verificar usuario y contraseña
         if paso == '1':
             username = request.form['username']
             password = request.form['password']
@@ -98,13 +104,36 @@ def admin_login():
                     pin = str(random.randint(100000, 999999))
                     session['admin_pin'] = pin
                     session['admin_username'] = username
-                    return render_template('admin_login.html', paso=2, pin=pin)
+                    try:
+                        msg = Message(
+                            subject='GestiMuni Huánuco — Código de verificación',
+                            recipients=['pasivi22@gmail.com'],
+                            html=f'''
+                            <div style="font-family:Arial,sans-serif; max-width:400px; margin:0 auto; padding:20px; border:1px solid #dee2e6; border-radius:8px;">
+                                <div style="background:#2E7D4F; padding:15px; border-radius:6px 6px 0 0; text-align:center;">
+                                    <h2 style="color:white; margin:0;">GestiMuni Huánuco</h2>
+                                </div>
+                                <div style="padding:20px; text-align:center;">
+                                    <p style="color:#555;">Tu código de verificación para acceder al panel administrativo es:</p>
+                                    <div style="font-size:2.5rem; font-weight:700; letter-spacing:10px; color:#1B5E35; padding:15px; background:#E8F5EE; border-radius:6px;">
+                                        {pin}
+                                    </div>
+                                    <p style="color:#888; font-size:12px; margin-top:15px;">Este código expira en 5 minutos. No lo compartas con nadie.</p>
+                                </div>
+                            </div>
+                            '''
+                        )
+                        mail.send(msg)
+                        flash('Código enviado a tu correo.', 'success')
+                    except Exception as e:
+                        flash('Error al enviar correo. Intenta de nuevo.', 'danger')
+                        return render_template('admin_login.html', paso=1)
+                    return render_template('admin_login.html', paso=2)
                 else:
                     flash('No tienes permiso de administrador.', 'danger')
             else:
                 flash('Usuario o contraseña incorrectos.', 'danger')
 
-        # Paso 2 — verificar PIN
         elif paso == '2':
             pin_ingresado = request.form['pin']
             pin_correcto = session.get('admin_pin')
@@ -116,8 +145,8 @@ def admin_login():
                 session.pop('admin_username', None)
                 return redirect(url_for('dashboard'))
             else:
-                flash('Código incorrecto.', 'danger')
-                return render_template('admin_login.html', paso=2, pin=pin_correcto)
+                flash('Código incorrecto. Intenta de nuevo.', 'danger')
+                return render_template('admin_login.html', paso=2)
 
     return render_template('admin_login.html', paso=1)
 
@@ -132,7 +161,7 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    if current_user.rol in ['admin', 'empleado']:
+    if current_user.rol == 'admin':
         total_tramites = Tramite.query.count()
         criticos = Tramite.query.filter_by(prioridad_ml='critico').count()
         postulantes = Postulante.query.count()
@@ -151,7 +180,7 @@ def dashboard():
 @app.route('/tramites')
 @login_required
 def tramites():
-    if current_user.rol in ['admin', 'empleado']:
+    if current_user.rol == 'admin':
         lista = Tramite.query.order_by(Tramite.fecha_registro.desc()).all()
     else:
         lista = Tramite.query.filter_by(ciudadano_id=current_user.id).all()
@@ -185,7 +214,7 @@ def nuevo_tramite():
 
 @app.route('/tramites/estado/<int:id>', methods=['POST'])
 @login_required
-@rol_requerido('admin', 'empleado')
+@rol_requerido('admin')
 def cambiar_estado(id):
     tramite = Tramite.query.get_or_404(id)
     tramite.estado = request.form['estado']
@@ -202,14 +231,14 @@ def cambiar_estado(id):
 # ── Currículos ───────────────────────────────────────────────────────
 @app.route('/curriculos')
 @login_required
-@rol_requerido('admin', 'empleado')
+@rol_requerido('admin')
 def curriculos():
     lista = Postulante.query.order_by(Postulante.puntaje_ml.desc()).all()
     return render_template('curriculos.html', postulantes=lista)
 
 @app.route('/curriculos/nuevo', methods=['GET', 'POST'])
 @login_required
-@rol_requerido('admin', 'empleado')
+@rol_requerido('admin')
 def nuevo_curriculo():
     if request.method == 'POST':
         nombre = request.form['nombre']
@@ -234,7 +263,7 @@ def nuevo_curriculo():
 @app.route('/alertas')
 @login_required
 def alertas():
-    if current_user.rol in ['admin', 'empleado']:
+    if current_user.rol == 'admin':
         lista = Alerta.query.order_by(Alerta.fecha.desc()).all()
     else:
         lista = Alerta.query.filter_by(ciudadano_id=current_user.id).all()
@@ -245,7 +274,7 @@ def alertas():
 @login_required
 @rol_requerido('admin')
 def usuarios():
-    lista = Usuario.query.all()
+    lista = Usuario.query.filter_by(rol='ciudadano').all()
     return render_template('usuarios.html', usuarios=lista)
 
 @app.route('/usuarios/nuevo', methods=['GET', 'POST'])
@@ -257,7 +286,7 @@ def nuevo_usuario():
             nombre=request.form['nombre'],
             username=request.form['username'],
             password=generate_password_hash(request.form['password']),
-            rol=request.form['rol']
+            rol='ciudadano'
         )
         db.session.add(usuario)
         db.session.commit()
@@ -273,8 +302,6 @@ def inicializar_bd():
             usuarios_default = [
                 Usuario(nombre='Administrador', username='admin',
                     password=generate_password_hash('admin123'), rol='admin'),
-                Usuario(nombre='Empleado Municipal', username='empleado1',
-                    password=generate_password_hash('user123'), rol='empleado'),
                 Usuario(nombre='Juan Pérez', username='ciudadano1',
                     password=generate_password_hash('1234'), rol='ciudadano'),
             ]
