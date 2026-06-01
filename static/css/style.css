@@ -1,0 +1,309 @@
+/* ── Variables de color Huánuco ─────────────────── */
+:root {
+    --verde: #2E7D4F;
+    --verde-oscuro: #1B5E35;
+    --verde-claro: #E8F5EE;
+    --crema: #F5F0E8;
+    --crema-oscuro: #E8E0D0;
+    --rojo-peru: #CE1126;
+    --texto: #2C2C2C;
+    --texto-muted: #666;
+    --blanco: #FFFFFF;
+}
+
+/* ── General ────────────────────────────────────── */
+body {
+    font-family: 'Segoe UI', sans-serif;
+    color: var(--texto);
+    background: #f9f9f9;
+}
+
+/* ── Navbar ─────────────────────────────────────── */
+.bg-institucional {
+    background-color: var(--verde) !important;
+}
+
+.navbar-brand {
+    font-weight: bold;
+}
+
+.logo-gm {
+    background: var(--crema);
+    color: var(--verde);
+    padding: 2px 8px;
+    border-radius: 5px;
+    font-weight: bold;
+}
+
+/* ── Sidebar ─────────────────────────────────────── */
+.sidebar {
+    min-height: calc(100vh - 56px);
+    background-color: #f8f9fa;
+    border-right: 1px solid #dee2e6;
+}
+
+.sidebar .nav-link {
+    color: #333;
+    padding: 10px 15px;
+    border-radius: 8px;
+    margin: 2px 0;
+}
+
+.sidebar .nav-link:hover {
+    background-color: var(--verde-claro);
+    color: var(--verde);
+}
+
+.sidebar .nav-link.active {
+    background-color: var(--verde);
+    color: white;
+}
+
+/* ── Badges prioridad ────────────────────────────── */
+.badge-critico {
+    background-color: #dc3545;
+    color: white;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+}
+
+.badge-normal {
+    background-color: #ffc107;
+    color: #000;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+}
+
+.badge-bajo {
+    background-color: var(--verde);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+}
+
+/* ── Cards ───────────────────────────────────────── */
+.card-stat {
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    background: var(--blanco);
+}
+
+/* ── Tabla ───────────────────────────────────────── */
+.table th {
+    background-color: var(--verde);
+    color: white;
+}
+
+/* ── Botones ─────────────────────────────────────── */
+.btn-institucional {
+    background-color: var(--verde);
+    color: white;
+    border: none;
+}
+
+.btn-institucional:hover {
+    background-color: var(--verde-oscuro);
+    color: white;
+}
+
+/* ── Página inicio ───────────────────────────────── */
+.franja-institucional {
+    background: var(--rojo-peru);
+    margin: -1.5rem -1.5rem 0 -1.5rem;
+    padding: 6px 2rem;
+}
+
+.franja-institucional small {
+    color: white;
+    font-size: 11px;
+    letter-spacing: 1px;
+}
+
+.hero-inicio {
+    background: var(--verde-oscuro);
+    border-bottom: 3px solid var(--crema);
+    margin: 0 -1.5rem 2.5rem -1.5rem;
+    padding: 3rem 2rem;
+    min-height: 320px;
+}
+
+.hero-titulo {
+    font-size: 2rem;
+    font-weight: 700;
+    color: white;
+}
+
+.hero-subtitulo {
+    color: rgba(255,255,255,0.85);
+    font-size: 0.95rem;
+    line-height: 1.7;
+}
+
+.estado-sistema {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.estado-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 13px;
+    color: #333;
+}
+
+.badge-activo {
+    background: #d4edda;
+    color: #155724;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 3px;
+}
+
+.barra-stats {
+    background: var(--verde);
+    margin: 0 -1.5rem 2.5rem -1.5rem;
+    padding: 1.2rem 2rem;
+}
+
+.stat-numero {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--crema);
+}
+
+.stat-texto {
+    font-size: 11px;
+    color: rgba(255,255,255,0.8);
+}
+
+.servicio-card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-left: 4px solid var(--verde);
+    border-radius: 6px;
+    padding: 1.5rem;
+    height: 100%;
+    transition: box-shadow 0.2s;
+}
+
+.servicio-card:hover {
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    border-left-color: var(--verde-oscuro);
+}
+
+.servicio-card.urgente {
+    border-left-color: #dc3545;
+}
+
+.servicio-icono {
+    background: var(--verde-claro);
+    width: 44px;
+    height: 44px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+.servicio-icono.urgente {
+    background: #fce8e8;
+}
+
+.plazo-badge {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+}
+
+.plazo-normal { background: #fff3cd; color: #856404; }
+.plazo-rapido { background: var(--verde-claro); color: var(--verde-oscuro); }
+.plazo-urgente { background: #f8d7da; color: #842029; }
+
+.proceso-box {
+    background: var(--crema);
+    border-radius: 10px;
+    padding: 2.5rem;
+    margin-bottom: 2.5rem;
+}
+
+.proceso-numero {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+    font-weight: 700;
+    font-size: 1.2rem;
+}
+
+.cta-box {
+    background: var(--crema);
+    border: 1px solid var(--crema-oscuro);
+    border-top: 4px solid var(--verde);
+    border-radius: 8px;
+    padding: 2.5rem;
+    text-align: center;
+    margin-bottom: 2.5rem;
+}
+
+.footer-inicio {
+    border-top: 1px solid #dee2e6;
+    padding: 1.2rem 0;
+    text-align: center;
+}
+
+/* ── Animaciones ─────────────────────────────────── */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInRight {
+    from { opacity: 0; transform: translateX(30px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(46, 125, 79, 0.4); }
+    70% { box-shadow: 0 0 0 8px rgba(46, 125, 79, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(46, 125, 79, 0); }
+}
+
+.animate-titulo {
+    animation: fadeInUp 0.8s ease forwards;
+}
+
+.animate-subtitulo {
+    animation: fadeInUp 0.8s ease 0.2s forwards;
+    opacity: 0;
+}
+
+.animate-botones {
+    animation: fadeInUp 0.8s ease 0.4s forwards;
+    opacity: 0;
+}
+
+.animate-card {
+    animation: fadeInRight 0.8s ease 0.3s forwards;
+    opacity: 0;
+}
+
+.punto-activo {
+    width: 8px;
+    height: 8px;
+    background: #2ecc71;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}

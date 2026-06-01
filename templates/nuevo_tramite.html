@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block contenido %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-institucional text-white">
+                <i class="bi bi-plus-circle"></i> Registrar Nuevo Trámite
+            </div>
+            <div class="card-body p-4">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Tipo de Trámite</label>
+                        <select name="tipo" class="form-select" required>
+                            <option value="">-- Selecciona --</option>
+                            <option value="licencia_construccion">Licencia de Construcción</option>
+                            <option value="certificado_residencia">Certificado de Residencia</option>
+                            <option value="permiso_negocio">Permiso de Negocio</option>
+                            <option value="denuncia_peligro">Denuncia de Peligro Público</option>
+                            <option value="partida_nacimiento">Partida de Nacimiento</option>
+                            <option value="licencia_funcionamiento">Licencia de Funcionamiento</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Urgencia</label>
+                        <select name="urgencia" class="form-select" required>
+                            <option value="">-- Selecciona --</option>
+                            <option value="alta">Alta</option>
+                            <option value="media">Media</option>
+                            <option value="baja">Baja</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Descripción</label>
+                        <textarea name="descripcion" class="form-control" rows="4"
+                            placeholder="Describe tu trámite..." required></textarea>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-institucional w-100">
+                            <i class="bi bi-cpu"></i> Registrar y Clasificar con ML
+                        </button>
+                        <a href="{{ url_for('tramites') }}" class="btn btn-outline-secondary w-100">
+                            Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

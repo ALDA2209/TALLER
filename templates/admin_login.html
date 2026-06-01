@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block contenido %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div style="background:var(--verde-oscuro); padding:1.5rem; border-radius:8px 8px 0 0; text-align:center;">
+                <span class="logo-gm fs-4">GM</span>
+                <h5 class="mt-2 fw-bold text-white">Acceso Personal Municipal</h5>
+                <p style="color:rgba(255,255,255,0.7); font-size:13px;">Solo para administradores y empleados</p>
+            </div>
+            <div class="card-body p-4">
+                <div class="alert alert-warning d-flex align-items-center gap-2" style="font-size:13px;">
+                    <i class="bi bi-shield-lock"></i>
+                    <span>Acceso restringido — Solo personal autorizado</span>
+                </div>
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label"><i class="bi bi-person"></i> Usuario</label>
+                        <input type="text" name="username" class="form-control" placeholder="Usuario municipal" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><i class="bi bi-lock"></i> Contraseña</label>
+                        <input type="password" name="password" class="form-control" placeholder="Contraseña" required>
+                    </div>
+                    <button type="submit" class="btn btn-institucional w-100">
+                        <i class="bi bi-box-arrow-in-right"></i> Ingresar
+                    </button>
+                </form>
+                <hr>
+                <div class="text-center">
+                    <a href="{{ url_for('inicio') }}" class="text-muted" style="font-size:13px;">
+                        <i class="bi bi-arrow-left"></i> Volver al inicio
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

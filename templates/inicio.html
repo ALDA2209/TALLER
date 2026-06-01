@@ -1,0 +1,154 @@
+{% extends 'base.html' %}
+
+{% block contenido %}
+
+<!-- Hero -->
+<div style="background:linear-gradient(135deg, #1B5E35 0%, #2E7D4F 100%); margin:0 -1.5rem 0 -1.5rem; padding:5rem 3rem; min-height:380px; display:flex; align-items:center;">
+    <div class="row align-items-center w-100">
+        <div class="col-md-7">
+            <p style="color:#F5F0E8; font-size:11px; text-transform:uppercase; letter-spacing:3px; margin-bottom:12px; opacity:0.8;">Portal de Servicios Digitales</p>
+            <h1 style="font-size:2.8rem; font-weight:700; color:white; line-height:1.2; margin-bottom:1rem;" class="animate-titulo">
+                GestiMuni<br>Huánuco
+            </h1>
+            <p style="color:rgba(255,255,255,0.85); font-size:1rem; max-width:520px; line-height:1.8; margin-bottom:2rem;" class="animate-subtitulo">
+                Realiza tus trámites municipales de forma digital, transparente y sin filas. Sistema automatizado con inteligencia artificial.
+            </p>
+            <div class="animate-botones">
+                <a href="{{ url_for('login') }}" style="background:#F5F0E8; color:#1B5E35; padding:12px 32px; border-radius:4px; font-weight:700; text-decoration:none; font-size:0.95rem;">
+                    Acceder al Portal
+                </a>
+            </div>
+        </div>
+        <div class="col-md-5 d-none d-md-block text-end">
+            <div style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:12px; padding:2rem; display:inline-block; text-align:left; min-width:280px;">
+                <p style="color:#F5F0E8; font-size:11px; text-transform:uppercase; letter-spacing:1px; margin-bottom:1rem; opacity:0.8;">Trámites disponibles</p>
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    <div style="display:flex; align-items:center; gap:10px; color:white; font-size:13px;">
+                        <i class="bi bi-house-check" style="font-size:18px; color:#F5F0E8;"></i>
+                        Licencia de Construcción
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px; color:white; font-size:13px;">
+                        <i class="bi bi-file-earmark-person" style="font-size:18px; color:#F5F0E8;"></i>
+                        Certificado de Residencia
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px; color:white; font-size:13px;">
+                        <i class="bi bi-shop" style="font-size:18px; color:#F5F0E8;"></i>
+                        Permiso de Negocio
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px; color:white; font-size:13px;">
+                        <i class="bi bi-briefcase" style="font-size:18px; color:#F5F0E8;"></i>
+                        Licencia de Funcionamiento
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px; color:white; font-size:13px;">
+                        <i class="bi bi-file-earmark-text" style="font-size:18px; color:#F5F0E8;"></i>
+                        Partida de Nacimiento
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px; color:white; font-size:13px;">
+                        <i class="bi bi-exclamation-triangle" style="font-size:18px; color:#ffcccc;"></i>
+                        Denuncia de Peligro Público
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Servicios -->
+<div style="padding:3rem 0;">
+    <div class="text-center mb-4">
+        <h2 style="font-weight:700; color:#1B5E35;">Trámites Disponibles</h2>
+        <p class="text-muted" style="font-size:0.9rem;">Selecciona el servicio que necesitas para iniciar tu solicitud</p>
+    </div>
+    <div class="row g-3">
+        <div class="col-md-4">
+            <div style="background:#1B5E35; border-radius:8px; padding:1.5rem; height:100%; color:white; transition:transform 0.2s;" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
+                <i class="bi bi-house-check" style="font-size:2rem; color:#F5F0E8; margin-bottom:1rem; display:block;"></i>
+                <h6 style="font-weight:700; color:white;">Licencia de Construcción</h6>
+                <p style="font-size:13px; color:rgba(255,255,255,0.8); margin-bottom:1rem;">Para construcción, ampliación o remodelación de inmuebles en la provincia.</p>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="background:rgba(255,255,255,0.15); color:#F5F0E8; font-size:11px; padding:3px 10px; border-radius:20px;">Plazo: 15 días</span>
+                    <a href="{{ url_for('login') }}" style="color:#F5F0E8; font-size:13px; font-weight:600; text-decoration:none;">Solicitar →</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div style="background:#2E7D4F; border-radius:8px; padding:1.5rem; height:100%; color:white; transition:transform 0.2s;" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
+                <i class="bi bi-file-earmark-person" style="font-size:2rem; color:#F5F0E8; margin-bottom:1rem; display:block;"></i>
+                <h6 style="font-weight:700; color:white;">Certificado de Residencia</h6>
+                <p style="font-size:13px; color:rgba(255,255,255,0.8); margin-bottom:1rem;">Documento oficial que acredita tu domicilio para trámites bancarios y escolares.</p>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="background:rgba(255,255,255,0.15); color:#F5F0E8; font-size:11px; padding:3px 10px; border-radius:20px;">Plazo: 3 días</span>
+                    <a href="{{ url_for('login') }}" style="color:#F5F0E8; font-size:13px; font-weight:600; text-decoration:none;">Solicitar →</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div style="background:#1B5E35; border-radius:8px; padding:1.5rem; height:100%; color:white; transition:transform 0.2s;" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
+                <i class="bi bi-shop" style="font-size:2rem; color:#F5F0E8; margin-bottom:1rem; display:block;"></i>
+                <h6 style="font-weight:700; color:white;">Permiso de Negocio</h6>
+                <p style="font-size:13px; color:rgba(255,255,255,0.8); margin-bottom:1rem;">Autorización para el inicio de actividades comerciales en la provincia.</p>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="background:rgba(255,255,255,0.15); color:#F5F0E8; font-size:11px; padding:3px 10px; border-radius:20px;">Plazo: 10 días</span>
+                    <a href="{{ url_for('login') }}" style="color:#F5F0E8; font-size:13px; font-weight:600; text-decoration:none;">Solicitar →</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div style="background:#b71c1c; border-radius:8px; padding:1.5rem; height:100%; color:white; transition:transform 0.2s;" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
+                <i class="bi bi-exclamation-triangle" style="font-size:2rem; color:#ffcccc; margin-bottom:1rem; display:block;"></i>
+                <h6 style="font-weight:700; color:white;">Denuncia de Peligro Público</h6>
+                <p style="font-size:13px; color:rgba(255,255,255,0.8); margin-bottom:1rem;">Reporta postes caídos, vías dañadas u otras situaciones de riesgo urbano.</p>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="background:rgba(255,255,255,0.15); color:#ffcccc; font-size:11px; padding:3px 10px; border-radius:20px;">Atención urgente</span>
+                    <a href="{{ url_for('login') }}" style="color:#ffcccc; font-size:13px; font-weight:600; text-decoration:none;">Reportar →</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div style="background:#2E7D4F; border-radius:8px; padding:1.5rem; height:100%; color:white; transition:transform 0.2s;" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
+                <i class="bi bi-file-earmark-text" style="font-size:2rem; color:#F5F0E8; margin-bottom:1rem; display:block;"></i>
+                <h6 style="font-weight:700; color:white;">Partida de Nacimiento</h6>
+                <p style="font-size:13px; color:rgba(255,255,255,0.8); margin-bottom:1rem;">Copias certificadas de partidas de nacimiento y otros documentos civiles.</p>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="background:rgba(255,255,255,0.15); color:#F5F0E8; font-size:11px; padding:3px 10px; border-radius:20px;">Plazo: 2 días</span>
+                    <a href="{{ url_for('login') }}" style="color:#F5F0E8; font-size:13px; font-weight:600; text-decoration:none;">Solicitar →</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div style="background:#1B5E35; border-radius:8px; padding:1.5rem; height:100%; color:white; transition:transform 0.2s;" onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
+                <i class="bi bi-briefcase" style="font-size:2rem; color:#F5F0E8; margin-bottom:1rem; display:block;"></i>
+                <h6 style="font-weight:700; color:white;">Licencia de Funcionamiento</h6>
+                <p style="font-size:13px; color:rgba(255,255,255,0.8); margin-bottom:1rem;">Autorización municipal para el funcionamiento de establecimientos comerciales.</p>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="background:rgba(255,255,255,0.15); color:#F5F0E8; font-size:11px; padding:3px 10px; border-radius:20px;">Plazo: 7 días</span>
+                    <a href="{{ url_for('login') }}" style="color:#F5F0E8; font-size:13px; font-weight:600; text-decoration:none;">Solicitar →</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const subtitulo = document.querySelector('.animate-subtitulo');
+    const botones = document.querySelector('.animate-botones');
+
+    if(subtitulo) {
+        subtitulo.style.opacity = '0';
+        setTimeout(() => {
+            subtitulo.style.animation = 'fadeInUp 0.8s ease forwards';
+            subtitulo.style.opacity = '1';
+        }, 200);
+    }
+    if(botones) {
+        botones.style.opacity = '0';
+        setTimeout(() => {
+            botones.style.animation = 'fadeInUp 0.8s ease forwards';
+            botones.style.opacity = '1';
+        }, 400);
+    }
+});
+</script>
+
+{% endblock %}

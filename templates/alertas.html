@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block contenido %}
+<h4 class="mb-4"><i class="bi bi-bell"></i> Alertas y Notificaciones</h4>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Ciudadano</th>
+                    <th>Mensaje</th>
+                    <th>Estado</th>
+                    <th>Fecha</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in alertas %}
+                <tr>
+                    <td>{{ a.id }}</td>
+                    <td>{{ a.ciudadano.nombre }}</td>
+                    <td>{{ a.mensaje }}</td>
+                    <td>
+                        {% if a.leido %}
+                        <span class="badge bg-secondary">Leído</span>
+                        {% else %}
+                        <span class="badge bg-warning text-dark">Nuevo</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ a.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-3">
+                        No hay alertas registradas aún.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
