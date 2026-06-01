@@ -13,7 +13,6 @@ app.config['SECRET_KEY'] = 'gestimuni2024'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///gestimuni.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# ── Configuración Gmail ──────────────────────────────────────────────
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
@@ -94,7 +93,6 @@ def registro():
 def admin_login():
     if request.method == 'POST':
         paso = request.form.get('paso')
-
         if paso == '1':
             username = request.form['username']
             password = request.form['password']
@@ -133,7 +131,6 @@ def admin_login():
                     flash('No tienes permiso de administrador.', 'danger')
             else:
                 flash('Usuario o contraseña incorrectos.', 'danger')
-
         elif paso == '2':
             pin_ingresado = request.form['pin']
             pin_correcto = session.get('admin_pin')
@@ -147,7 +144,6 @@ def admin_login():
             else:
                 flash('Código incorrecto. Intenta de nuevo.', 'danger')
                 return render_template('admin_login.html', paso=2)
-
     return render_template('admin_login.html', paso=1)
 
 # ── Logout ───────────────────────────────────────────────────────────
@@ -192,7 +188,15 @@ def nuevo_tramite():
     if request.method == 'POST':
         tipo = request.form['tipo']
         descripcion = request.form['descripcion']
-        urgencia = request.form['urgencia']
+        urgencias_map = {
+            'denuncia_peligro': 'alta',
+            'licencia_construccion': 'media',
+            'permiso_negocio': 'media',
+            'licencia_funcionamiento': 'media',
+            'certificado_residencia': 'baja',
+            'partida_nacimiento': 'baja'
+        }
+        urgencia = urgencias_map.get(tipo, 'media')
         prioridad = clasificar_tramite(tipo, urgencia)
         tramite = Tramite(
             ciudadano_id=current_user.id,
@@ -208,7 +212,7 @@ def nuevo_tramite():
         )
         db.session.add(alerta)
         db.session.commit()
-        flash(f'Trámite registrado con prioridad: {prioridad.upper()}', 'success')
+        flash(f'Trámite registrado. Prioridad asignada: {prioridad.upper()}', 'success')
         return redirect(url_for('tramites'))
     return render_template('nuevo_tramite.html')
 
