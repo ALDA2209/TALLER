@@ -1,10 +1,11 @@
-from flask import Flask, render_template, redirect, url_for, request, flash
+from flask import Flask, render_template, redirect, url_for, request, flash, session
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, Usuario, Tramite, Postulante, Alerta
 from ml import clasificar_tramite, evaluar_cv
 from datetime import datetime
 from functools import wraps
+import random
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'gestimuni2024'
@@ -50,8 +51,11 @@ def login():
             if user.rol == 'ciudadano':
                 login_user(user)
                 return redirect(url_for('dashboard'))
+            elif user.rol == 'empleado':
+                login_user(user)
+                return redirect(url_for('dashboard'))
             else:
-                flash('Usa el acceso de personal municipal.', 'danger')
+                flash('Usa el acceso de administrador.', 'danger')
         else:
             flash('Usuario o contraseña incorrectos.', 'danger')
     return render_template('login.html')
@@ -78,22 +82,44 @@ def registro():
         return redirect(url_for('login'))
     return render_template('registro.html')
 
-# ── Login admin/empleado ─────────────────────────────────────────────
+# ── Login admin con PIN ──────────────────────────────────────────────
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        user = Usuario.query.filter_by(username=username).first()
-        if user and check_password_hash(user.password, password):
-            if user.rol in ['admin', 'empleado']:
+        paso = request.form.get('paso')
+
+        # Paso 1 — verificar usuario y contraseña
+        if paso == '1':
+            username = request.form['username']
+            password = request.form['password']
+            user = Usuario.query.filter_by(username=username).first()
+            if user and check_password_hash(user.password, password):
+                if user.rol == 'admin':
+                    pin = str(random.randint(100000, 999999))
+                    session['admin_pin'] = pin
+                    session['admin_username'] = username
+                    return render_template('admin_login.html', paso=2, pin=pin)
+                else:
+                    flash('No tienes permiso de administrador.', 'danger')
+            else:
+                flash('Usuario o contraseña incorrectos.', 'danger')
+
+        # Paso 2 — verificar PIN
+        elif paso == '2':
+            pin_ingresado = request.form['pin']
+            pin_correcto = session.get('admin_pin')
+            username = session.get('admin_username')
+            if pin_ingresado == pin_correcto:
+                user = Usuario.query.filter_by(username=username).first()
                 login_user(user)
+                session.pop('admin_pin', None)
+                session.pop('admin_username', None)
                 return redirect(url_for('dashboard'))
             else:
-                flash('No tienes permiso para acceder por esta vía.', 'danger')
-        else:
-            flash('Usuario o contraseña incorrectos.', 'danger')
-    return render_template('admin_login.html')
+                flash('Código incorrecto.', 'danger')
+                return render_template('admin_login.html', paso=2, pin=pin_correcto)
+
+    return render_template('admin_login.html', paso=1)
 
 # ── Logout ───────────────────────────────────────────────────────────
 @app.route('/logout')

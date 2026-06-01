@@ -6,27 +6,56 @@
         <div class="card shadow-sm">
             <div style="background:var(--verde-oscuro); padding:1.5rem; border-radius:8px 8px 0 0; text-align:center;">
                 <span class="logo-gm fs-4">GM</span>
-                <h5 class="mt-2 fw-bold text-white">Acceso Personal Municipal</h5>
-                <p style="color:rgba(255,255,255,0.7); font-size:13px;">Solo para administradores y empleados</p>
+                <h5 class="mt-2 fw-bold text-white">Acceso Administrativo</h5>
+                <p style="color:rgba(255,255,255,0.7); font-size:13px;">Solo para administradores</p>
             </div>
             <div class="card-body p-4">
                 <div class="alert alert-warning d-flex align-items-center gap-2" style="font-size:13px;">
                     <i class="bi bi-shield-lock"></i>
                     <span>Acceso restringido — Solo personal autorizado</span>
                 </div>
+
+                {% if paso == 1 %}
+                <!-- Paso 1: Usuario y contraseña -->
                 <form method="POST">
+                    <input type="hidden" name="paso" value="1">
                     <div class="mb-3">
                         <label class="form-label"><i class="bi bi-person"></i> Usuario</label>
-                        <input type="text" name="username" class="form-control" placeholder="Usuario municipal" required>
+                        <input type="text" name="username" class="form-control" placeholder="Usuario administrador" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label"><i class="bi bi-lock"></i> Contraseña</label>
                         <input type="password" name="password" class="form-control" placeholder="Contraseña" required>
                     </div>
                     <button type="submit" class="btn btn-institucional w-100">
-                        <i class="bi bi-box-arrow-in-right"></i> Ingresar
+                        <i class="bi bi-arrow-right-circle"></i> Continuar
                     </button>
                 </form>
+
+                {% elif paso == 2 %}
+                <!-- Paso 2: PIN de verificación -->
+                <div class="alert alert-success text-center mb-3">
+                    <i class="bi bi-check-circle"></i> Credenciales correctas
+                    <hr style="margin:8px 0;">
+                    <p style="font-size:12px; margin:0;">Tu código de verificación es:</p>
+                    <div style="font-size:2rem; font-weight:700; letter-spacing:8px; color:var(--verde-oscuro);">
+                        {{ pin }}
+                    </div>
+                </div>
+                <form method="POST">
+                    <input type="hidden" name="paso" value="2">
+                    <div class="mb-3">
+                        <label class="form-label"><i class="bi bi-key"></i> Ingresa el código</label>
+                        <input type="text" name="pin" class="form-control text-center"
+                            style="font-size:1.5rem; letter-spacing:6px; font-weight:700;"
+                            maxlength="6" placeholder="000000" required autofocus>
+                    </div>
+                    <button type="submit" class="btn btn-institucional w-100">
+                        <i class="bi bi-shield-check"></i> Verificar y Acceder
+                    </button>
+                </form>
+                {% endif %}
+
                 <hr>
                 <div class="text-center">
                     <a href="{{ url_for('inicio') }}" class="text-muted" style="font-size:13px;">
