@@ -128,6 +128,25 @@
                 <div class="text-muted mt-1" style="font-size:10px;">
                   IA: {{ (t.confianza_ml * 100)|round(1) }}%
                 </div>
+
+                {% if t.explicacion_ml %}
+                <div class="mt-1">
+                  <button class="btn btn-link btn-sm p-0 text-decoration-none"
+                          data-bs-toggle="collapse"
+                          data-bs-target="#exp{{ t.id }}">
+                    <i class="bi bi-info-circle"></i>
+                    Ver explicación IA
+                  </button>
+
+                  <div class="collapse mt-1" id="exp{{ t.id }}">
+                    <div class="card card-body bg-light border-0 small text-muted">
+                      {{ t.explicacion_ml }}
+                    </div>
+                    </div>
+                </div>
+                {% endif %}
+
+
               </td>
               <td>
                 {% if t.estado == 'aprobado' %}

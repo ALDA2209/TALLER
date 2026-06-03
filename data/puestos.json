@@ -1,0 +1,343 @@
+{
+  "abogado": {
+    "nombre": "Abogado Municipal",
+    "educacion_clave": [
+      "derecho",
+      "abogado",
+      "juridico",
+      "legal",
+      "leyes"
+    ],
+    "habilidades_clave": [
+      "contratos",
+      "normativa",
+      "expedientes",
+      "derecho administrativo",
+      "litigios",
+      "asesoria legal"
+    ],
+    "certificaciones_clave": [
+      "colegiatura",
+      "cal",
+      "derecho administrativo",
+      "contrataciones del estado"
+    ],
+    "min_experiencia": 1
+  },
+  "contador": {
+    "nombre": "Contador Municipal",
+    "educacion_clave": [
+      "contabilidad",
+      "contador",
+      "finanzas",
+      "tributacion"
+    ],
+    "habilidades_clave": [
+      "siga",
+      "siaf",
+      "presupuesto",
+      "balance",
+      "tesoreria",
+      "costos",
+      "excel"
+    ],
+    "certificaciones_clave": [
+      "contabilidad gubernamental",
+      "siaf",
+      "siga",
+      "tributacion"
+    ],
+    "min_experiencia": 1
+  },
+  "administrador": {
+    "nombre": "Administrador Público",
+    "educacion_clave": [
+      "administracion",
+      "gestion publica",
+      "management"
+    ],
+    "habilidades_clave": [
+      "gestion",
+      "planeamiento",
+      "organizacion",
+      "recursos humanos",
+      "logistica",
+      "excel"
+    ],
+    "certificaciones_clave": [
+      "gestion publica",
+      "servir",
+      "contrataciones",
+      "planeamiento"
+    ],
+    "min_experiencia": 1
+  },
+  "secretaria": {
+    "nombre": "Secretaria Administrativa",
+    "educacion_clave": [
+      "secretariado",
+      "administracion",
+      "tecnico"
+    ],
+    "habilidades_clave": [
+      "word",
+      "excel",
+      "archivo",
+      "redaccion",
+      "atencion al cliente",
+      "ofimatica"
+    ],
+    "certificaciones_clave": [
+      "ofimatica",
+      "excel",
+      "secretariado"
+    ],
+    "min_experiencia": 1
+  },
+  "asistente_administrativo": {
+    "nombre": "Asistente Administrativo",
+    "educacion_clave": [
+      "administracion",
+      "secretariado",
+      "asistente administrativo"
+    ],
+    "habilidades_clave": [
+      "archivo",
+      "tramite documentario",
+      "atencion al usuario",
+      "word",
+      "excel",
+      "redaccion"
+    ],
+    "certificaciones_clave": [
+      "ofimatica",
+      "gestion documental",
+      "excel"
+    ],
+    "min_experiencia": 1
+  },
+  "ingeniero_civil": {
+    "nombre": "Ingeniero Civil",
+    "educacion_clave": [
+      "ingenieria civil",
+      "civil",
+      "obras",
+      "construccion"
+    ],
+    "habilidades_clave": [
+      "autocad",
+      "civil 3d",
+      "s10",
+      "presupuestos",
+      "metrados",
+      "valorizaciones",
+      "expediente tecnico",
+      "ms project"
+    ],
+    "certificaciones_clave": [
+      "residente de obra",
+      "supervisor de obra",
+      "seguridad en obra"
+    ],
+    "min_experiencia": 2
+  },
+  "arquitecto": {
+    "nombre": "Arquitecto Municipal",
+    "educacion_clave": [
+      "arquitectura",
+      "arquitecto",
+      "urbanismo",
+      "diseno arquitectonico"
+    ],
+    "habilidades_clave": [
+      "autocad",
+      "sketchup",
+      "revit",
+      "planos",
+      "licencias",
+      "catastro",
+      "urbanismo"
+    ],
+    "certificaciones_clave": [
+      "revit",
+      "autocad",
+      "habilitacion urbana"
+    ],
+    "min_experiencia": 1
+  },
+  "tecnico_informatica": {
+    "nombre": "Técnico en Informática",
+    "educacion_clave": [
+      "computacion",
+      "informatica",
+      "sistemas",
+      "software"
+    ],
+    "habilidades_clave": [
+      "soporte tecnico",
+      "redes",
+      "windows",
+      "linux",
+      "base de datos",
+      "sql",
+      "python",
+      "java",
+      "php"
+    ],
+    "certificaciones_clave": [
+      "redes",
+      "cisco",
+      "soporte tecnico",
+      "base de datos"
+    ],
+    "min_experiencia": 1
+  },
+  "programador": {
+    "nombre": "Programador / Desarrollador",
+    "educacion_clave": [
+      "software",
+      "sistemas",
+      "computacion",
+      "informatica",
+      "programacion"
+    ],
+    "habilidades_clave": [
+      "python",
+      "java",
+      "php",
+      "javascript",
+      "sql",
+      "mysql",
+      "flask",
+      "laravel",
+      "react"
+    ],
+    "certificaciones_clave": [
+      "backend",
+      "frontend",
+      "base de datos",
+      "desarrollo web"
+    ],
+    "min_experiencia": 1
+  },
+  "project_manager": {
+    "nombre": "Project Manager",
+    "educacion_clave": [
+      "management",
+      "administracion",
+      "maestria",
+      "master",
+      "product owner"
+    ],
+    "habilidades_clave": [
+      "project manager",
+      "product manager",
+      "product owner",
+      "customer success",
+      "pmp",
+      "capm",
+      "trello",
+      "notion",
+      "analytics",
+      "zendesk",
+      "mixpanel",
+      "google analytics",
+      "tableau",
+      "intercom"
+    ],
+    "certificaciones_clave": [
+      "pmp",
+      "capm",
+      "google ads",
+      "certificado",
+      "diplomado"
+    ],
+    "min_experiencia": 2
+  },
+  "recursos_humanos": {
+    "nombre": "Recursos Humanos",
+    "educacion_clave": [
+      "recursos humanos",
+      "psicologia",
+      "administracion"
+    ],
+    "habilidades_clave": [
+      "seleccion",
+      "entrevista",
+      "planillas",
+      "capacitacion",
+      "clima laboral"
+    ],
+    "certificaciones_clave": [
+      "gestion del talento",
+      "planillas",
+      "legislacion laboral"
+    ],
+    "min_experiencia": 1
+  },
+  "atencion_ciudadano": {
+    "nombre": "Atención al Ciudadano",
+    "educacion_clave": [
+      "administracion",
+      "comunicacion",
+      "secretariado"
+    ],
+    "habilidades_clave": [
+      "atencion al cliente",
+      "atencion al ciudadano",
+      "comunicacion",
+      "reclamos",
+      "orientacion",
+      "mesa de partes"
+    ],
+    "certificaciones_clave": [
+      "atencion al cliente",
+      "calidad de servicio"
+    ],
+    "min_experiencia": 0
+  },
+  "seguridad_ciudadana": {
+    "nombre": "Seguridad Ciudadana",
+    "educacion_clave": [
+      "seguridad",
+      "serenazgo",
+      "policia",
+      "prevencion"
+    ],
+    "habilidades_clave": [
+      "serenazgo",
+      "patrullaje",
+      "primeros auxilios",
+      "prevencion",
+      "control"
+    ],
+    "certificaciones_clave": [
+      "primeros auxilios",
+      "seguridad ciudadana",
+      "defensa civil"
+    ],
+    "min_experiencia": 0
+  },
+  "logistica": {
+    "nombre": "Logística Municipal",
+    "educacion_clave": [
+      "logistica",
+      "administracion",
+      "abastecimiento"
+    ],
+    "habilidades_clave": [
+      "compras",
+      "almacen",
+      "contrataciones",
+      "seace",
+      "siga",
+      "inventario"
+    ],
+    "certificaciones_clave": [
+      "contrataciones del estado",
+      "seace",
+      "siga"
+    ],
+    "min_experiencia": 1
+  }
+}

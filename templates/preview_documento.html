@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Vista previa — GestiMuni{% endblock %}
+
+{% block contenido %}
+<div class="container-fluid py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h3 class="fw-bold">
+        <i class="bi bi-file-earmark-text text-success"></i>
+        Vista previa del documento
+      </h3>
+      <p class="text-muted mb-0">{{ doc.nombre_original }}</p>
+    </div>
+
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('detalle_tramite', id=doc.tramite_id) }}"
+         class="btn btn-outline-secondary">
+        ← Volver al trámite
+      </a>
+
+      <a href="{{ url_for('descargar_documento', doc_id=doc.id) }}"
+         class="btn btn-success">
+        Descargar
+      </a>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-body">
+
+      {% if tipo in ['xlsx', 'xls'] %}
+      <div class="table-responsive">
+        <table class="table table-bordered table-sm align-middle">
+          <tbody>
+            {% for fila in contenido %}
+            <tr>
+              {% for celda in fila %}
+              <td>{{ celda }}</td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% elif tipo == 'docx' %}
+        {% for parrafo in contenido %}
+          <p>{{ parrafo }}</p>
+        {% endfor %}
+      {% endif %}
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}

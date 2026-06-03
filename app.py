@@ -4,7 +4,9 @@ Roles: admin | empleado | ciudadano
 Incluye: subida de docs, exportación Excel, alertas por correo al ciudadano,
          búsqueda por DNI, CRUD completo de usuarios, dashboard ML
 """
-
+import csv
+import docx2txt
+import random, os, io, uuid, json, re, zipfile, unicodedata
 from flask import (Flask, render_template, redirect, url_for, request,
                    flash, session, jsonify, send_file, abort)
 from flask_login import (LoginManager, login_user, logout_user,
@@ -14,7 +16,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from models import db, Usuario, Tramite, Postulante, Alerta, Documento, LogActividad
 from ml import (clasificar_tramite, evaluar_cv,
-                obtener_stats_tramites, obtener_stats_cvs, reentrenar)
+                obtener_stats_tramites, obtener_stats_cvs, reentrenar, explicar_tramite)
 from datetime import datetime
 from functools import wraps
 import random, os, io, uuid
@@ -27,6 +29,10 @@ from openpyxl.utils import get_column_letter
 from services.auditoria_service import registrar_auditoria
 from models import db, Usuario, Tramite, Postulante, Alerta, Auditoria
 # ── dotenv ───────────────────────────────────────────────────────────
+# ver documentos
+from openpyxl import load_workbook
+from docx import Document as DocxDocument
+from PyPDF2 import PdfReader
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -364,13 +370,23 @@ def nuevo_tramite():
             'partida_nacimiento':      'baja'
         }
         urgencia  = urgencias_map.get(tipo, 'media')
-        prioridad, confianza = clasificar_tramite(tipo, urgencia)
+        
+        dias_resolucion = int(request.form.get('dias_resolucion', 5))
+        cantidad_documentos = int(request.form.get('cantidad_documentos', 1))
+        
+        prioridad, confianza = clasificar_tramite(tipo, urgencia, dias_resolucion, cantidad_documentos)
+        explicacion = explicar_tramite(tipo, urgencia, prioridad, dias_resolucion, cantidad_documentos)
 
         tramite = Tramite(
             ciudadano_id=current_user.id,
-            tipo=tipo, descripcion=descripcion,
-            urgencia=urgencia, prioridad_ml=prioridad,
-            confianza_ml=confianza
+            tipo=tipo, 
+            descripcion=descripcion,
+            urgencia=urgencia, 
+            prioridad_ml=prioridad,
+            confianza_ml=confianza, 
+            dias_resolucion=dias_resolucion,
+            explicacion_ml=explicacion
+            
         )
         db.session.add(tramite)
         db.session.flush()
@@ -408,10 +424,12 @@ def nuevo_tramite():
 
         registrar_log('nuevo_tramite', 'Tramite', tramite.id)
         db.session.commit()
+        
         registrar_auditoria(
             f"Registró trámite #{tramite.id}: {tipo.replace('_', ' ').title()} con prioridad {prioridad.upper()}",
-            'Trámites'
+            "Trámites"
         )
+        
 
         # Correo al ciudadano
         html_c = _html_alerta_tramite(
@@ -455,7 +473,7 @@ def cambiar_estado(id):
     db.session.commit()
     registrar_auditoria(
         f"Cambió el trámite #{tramite.id} al estado {nuevo_estado.upper().replace('_', ' ')}",
-        'Trámites'
+        "Trámites"
     )
 
     # Correo al ciudadano
@@ -489,13 +507,49 @@ def detalle_tramite(id):
 @app.route('/documentos/ver/<int:doc_id>')
 @login_required
 def ver_documento(doc_id):
-    doc   = Documento.query.get_or_404(doc_id)
-    ruta  = os.path.join(app.config['UPLOAD_FOLDER'], doc.nombre_archivo)
+    doc = Documento.query.get_or_404(doc_id)
+    ruta = os.path.join(app.config['UPLOAD_FOLDER'], doc.nombre_archivo)
+
     if not os.path.exists(ruta):
         abort(404)
-    return send_file(ruta, mimetype=doc.tipo_mime,
-                     download_name=doc.nombre_original)
 
+    extension = doc.nombre_original.rsplit('.', 1)[-1].lower()
+
+    contenido_preview = None
+    tipo_preview = extension
+
+    if extension in ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'txt']:
+        return send_file(
+            ruta,
+            mimetype=doc.tipo_mime,
+            as_attachment=False,
+            download_name=doc.nombre_original
+        )
+
+    if extension in ['xlsx', 'xls']:
+        wb = load_workbook(ruta, data_only=True)
+        ws = wb.active
+
+        filas = []
+        for row in ws.iter_rows(values_only=True):
+            filas.append([cell if cell is not None else '' for cell in row])
+
+        contenido_preview = filas
+
+    elif extension in ['docx']:
+        documento = DocxDocument(ruta)
+        contenido_preview = [p.text for p in documento.paragraphs if p.text.strip()]
+
+    else:
+        flash('Vista previa no disponible para este tipo de archivo.', 'warning')
+        return redirect(url_for('detalle_tramite', id=doc.tramite_id))
+
+    return render_template(
+        'preview_documento.html',
+        doc=doc,
+        contenido=contenido_preview,
+        tipo=tipo_preview
+    )
 
 @app.route('/documentos/descargar/<int:doc_id>')
 @login_required
@@ -520,8 +574,8 @@ def eliminar_documento(doc_id):
     registrar_log('eliminar_doc', 'Documento', doc_id)
     db.session.commit()
     registrar_auditoria(
-        f'Eliminó documento {doc.nombre_original}',
-        'Documentos'
+        f"Eliminó documento {doc.nombre_original}",
+        "Documentos"
     )
     flash('Documento eliminado.', 'success')
     return redirect(request.referrer or url_for('tramites'))
@@ -537,40 +591,105 @@ def curriculos():
     lista = Postulante.query.order_by(Postulante.puntaje_ml.desc()).all()
     return render_template('curriculos.html', postulantes=lista)
 
-
 @app.route('/curriculos/nuevo', methods=['GET', 'POST'])
 @login_required
 @rol_requerido('admin', 'empleado')
 def nuevo_curriculo():
     if request.method == 'POST':
-        nombre     = request.form['nombre']
-        dni        = request.form.get('dni', '').strip() or None
-        email      = request.form.get('email', '').strip() or None
-        puesto     = request.form['puesto']
-        experiencia= int(request.form['experiencia'])
-        educacion  = request.form['educacion']
-        habilidades= int(request.form['habilidades'])
-        idiomas    = int(request.form.get('idiomas', 0))
 
-        resultado, puntaje, prob = evaluar_cv(
-            experiencia, educacion, habilidades, idiomas)
+        nombre = request.form.get('nombre', '').strip()
+        dni = request.form.get('dni', '').strip() or None
+        email = request.form.get('email', '').strip() or None
+        puesto_key = request.form.get('puesto', '').strip()
+
+        archivo_cv = request.files.get('archivo_cv')
+
+        nombre_archivo_cv = None
+        texto_cv = ""
+
+        if not nombre:
+            flash('Ingrese el nombre del postulante.', 'warning')
+            return redirect(url_for('nuevo_curriculo'))
+
+        if not puesto_key:
+            flash('Seleccione el puesto al que postula.', 'warning')
+            return redirect(url_for('nuevo_curriculo'))
+
+        if not archivo_cv or not archivo_cv.filename:
+            flash('Debe subir el currículum vitae en PDF, DOCX, TXT o CSV.', 'warning')
+            return redirect(url_for('nuevo_curriculo'))
+
+        nombre_original = secure_filename(archivo_cv.filename)
+        extension = nombre_original.rsplit('.', 1)[-1].lower()
+
+        if extension not in ['pdf', 'docx', 'txt', 'csv']:
+            flash('Formato no permitido. Use PDF, DOCX, TXT o CSV.', 'danger')
+            return redirect(url_for('nuevo_curriculo'))
+
+        nombre_archivo_cv = f"cv_{uuid.uuid4().hex}.{extension}"
+        ruta_cv = os.path.join(
+            app.config['UPLOAD_FOLDER'],
+            nombre_archivo_cv
+        )
+
+        archivo_cv.save(ruta_cv)
+
+        texto_cv = extraer_texto_cv(
+            ruta_cv,
+            extension
+        )
+
+        if not texto_cv:
+            flash('No se pudo extraer texto del CV. Verifique que el archivo tenga contenido legible.', 'danger')
+            return redirect(url_for('nuevo_curriculo'))
+
+        analisis = analizar_cv_por_puesto(
+            texto_cv,
+            puesto_key
+        )
 
         postulante = Postulante(
-            nombre=nombre, dni=dni, email=email, puesto=puesto,
-            experiencia=experiencia, educacion=educacion,
-            habilidades=habilidades, idiomas=str(idiomas),
-            resultado_ml=resultado, puntaje_ml=puntaje,
-            probabilidad=prob
+            nombre=nombre,
+            dni=dni,
+            email=email,
+            puesto=puesto_key,
+
+            experiencia=analisis["experiencia"],
+            educacion=analisis["educacion"],
+            habilidades=analisis["habilidades"],
+            idiomas=str(analisis["certificaciones"]),
+
+            resultado_ml=analisis["resultado"],
+            puntaje_ml=analisis["puntaje"],
+            probabilidad=analisis["probabilidad"],
+
+            archivo_cv=nombre_archivo_cv,
+            texto_cv=analisis["explicacion"]
         )
+
         db.session.add(postulante)
-        registrar_log('nuevo_curriculo', 'Postulante')
-        db.session.commit()
-        registrar_auditoria(
-            f'Evaluó CV de {nombre} para el puesto {puesto}: {resultado.upper()} con puntaje {puntaje}%',
-            'Currículos'
+
+        registrar_log(
+            'nuevo_curriculo',
+            'Postulante'
         )
-        flash(f'CV evaluado: {resultado.upper()} — Puntaje: {puntaje}%', 'success')
+
+        registrar_auditoria(
+            f"Evaluó CV de {nombre} para el puesto {puesto_key}: "
+            f"{analisis['resultado'].upper()} con puntaje {analisis['puntaje']}%",
+            "Currículos"
+        )
+
+        db.session.commit()
+
+        flash(
+            f"CV evaluado: {analisis['resultado'].upper()} — "
+            f"Puntaje: {analisis['puntaje']}%",
+            'success'
+        )
+
         return redirect(url_for('curriculos'))
+
     return render_template('nuevo_curriculo.html')
 
 
@@ -583,8 +702,8 @@ def eliminar_postulante(id):
     registrar_log('eliminar_postulante', 'Postulante', id)
     db.session.commit()
     registrar_auditoria(
-        f'Eliminó postulante {p.nombre}',
-        'Currículos'
+        f"Eliminó postulante {p.nombre}",
+        "Currículos"
     )
     flash('Postulante eliminado.', 'success')
     return redirect(url_for('curriculos'))
@@ -730,8 +849,8 @@ def eliminar_usuario(id):
     registrar_log('eliminar_usuario', 'Usuario', id)
     db.session.commit()
     registrar_auditoria(
-        f'Eliminó usuario {usuario.nombre}',
-        'Usuarios'
+        f"Eliminó usuario {usuario.nombre}",
+        "Usuarios"
     )
     flash('Usuario eliminado.', 'success')
     return redirect(url_for('usuarios'))
@@ -804,8 +923,8 @@ def ml_reentrenar():
     registrar_log('reentrenar_modelos', 'ML')
     db.session.commit()
     registrar_auditoria(
-        'Reentrenó los modelos de Machine Learning',
-        'Machine Learning'
+        "Reentrenó los modelos de Machine Learning",
+        "Machine Learning"
     )
     flash(f'Modelos reentrenados. Tramites accuracy='
           f'{resultado["tramites"].get("accuracy","?")} | '
@@ -1020,7 +1139,373 @@ def inicializar_bd():
             ]
             db.session.add_all(usuarios_default)
             db.session.commit()
-            print('[BD] Inicializada con usuarios por defecto.')
+            print('[BD] Inicializada con usuarios por defecto.')  
+
+
+# ════════════════════════════════════════════════════════════════════
+# IA AVANZADA PARA EVALUACIÓN DE CURRÍCULOS
+# ════════════════════════════════════════════════════════════════════
+def _normalizar_texto(texto):
+    """Convierte texto a minúsculas y elimina tildes para mejorar coincidencias."""
+    if not texto:
+        return ""
+    texto = unicodedata.normalize("NFKD", texto)
+    texto = "".join(c for c in texto if not unicodedata.combining(c))
+    return texto.lower()
+
+
+def _ruta_puestos_json():
+    return os.path.join(os.path.dirname(__file__), "data", "puestos.json")
+
+
+def cargar_puestos():
+    """Carga perfiles de puestos. Si no existe data/puestos.json, usa perfiles internos."""
+    puestos_default = {
+        "abogado": {
+            "nombre": "Abogado Municipal",
+            "educacion_clave": ["derecho", "abogado", "juridico", "legal", "leyes"],
+            "habilidades_clave": ["contratos", "normativa", "expedientes", "derecho administrativo", "litigios", "asesoria legal"],
+            "certificaciones_clave": ["colegiatura", "cal", "derecho administrativo", "contrataciones del estado"],
+            "min_experiencia": 1
+        },
+        "contador": {
+            "nombre": "Contador Municipal",
+            "educacion_clave": ["contabilidad", "contador", "finanzas", "tributacion"],
+            "habilidades_clave": ["siga", "siaf", "presupuesto", "balance", "tesoreria", "costos", "excel"],
+            "certificaciones_clave": ["contabilidad gubernamental", "siaf", "siga", "tributacion"],
+            "min_experiencia": 1
+        },
+        "administrador": {
+            "nombre": "Administrador Público",
+            "educacion_clave": ["administracion", "gestion publica", "management"],
+            "habilidades_clave": ["gestion", "planeamiento", "organizacion", "recursos humanos", "logistica", "excel"],
+            "certificaciones_clave": ["gestion publica", "servir", "contrataciones", "planeamiento"],
+            "min_experiencia": 1
+        },
+        "secretaria": {
+            "nombre": "Secretaria Administrativa",
+            "educacion_clave": ["secretariado", "administracion", "tecnico"],
+            "habilidades_clave": ["word", "excel", "archivo", "redaccion", "atencion al cliente", "ofimatica"],
+            "certificaciones_clave": ["ofimatica", "excel", "secretariado"],
+            "min_experiencia": 1
+        },
+        "asistente_administrativo": {
+            "nombre": "Asistente Administrativo",
+            "educacion_clave": ["administracion", "secretariado", "asistente administrativo"],
+            "habilidades_clave": ["archivo", "tramite documentario", "atencion al usuario", "word", "excel", "redaccion"],
+            "certificaciones_clave": ["ofimatica", "gestion documental", "excel"],
+            "min_experiencia": 1
+        },
+        "ingeniero_civil": {
+            "nombre": "Ingeniero Civil",
+            "educacion_clave": ["ingenieria civil", "civil", "obras", "construccion"],
+            "habilidades_clave": ["autocad", "civil 3d", "s10", "presupuestos", "metrados", "valorizaciones", "expediente tecnico", "ms project"],
+            "certificaciones_clave": ["residente de obra", "supervisor de obra", "seguridad en obra"],
+            "min_experiencia": 2
+        },
+        "arquitecto": {
+            "nombre": "Arquitecto Municipal",
+            "educacion_clave": ["arquitectura", "arquitecto", "urbanismo", "diseno arquitectonico"],
+            "habilidades_clave": ["autocad", "sketchup", "revit", "planos", "licencias", "catastro", "urbanismo"],
+            "certificaciones_clave": ["revit", "autocad", "habilitacion urbana"],
+            "min_experiencia": 1
+        },
+        "tecnico_informatica": {
+            "nombre": "Técnico en Informática",
+            "educacion_clave": ["computacion", "informatica", "sistemas", "software"],
+            "habilidades_clave": ["soporte tecnico", "redes", "windows", "linux", "base de datos", "sql", "python", "java", "php"],
+            "certificaciones_clave": ["redes", "cisco", "soporte tecnico", "base de datos"],
+            "min_experiencia": 1
+        },
+        "programador": {
+            "nombre": "Programador / Desarrollador",
+            "educacion_clave": ["software", "sistemas", "computacion", "informatica", "programacion"],
+            "habilidades_clave": ["python", "java", "php", "javascript", "sql", "mysql", "flask", "laravel", "react"],
+            "certificaciones_clave": ["backend", "frontend", "base de datos", "desarrollo web"],
+            "min_experiencia": 1
+        },
+        "project_manager": {
+            "nombre": "Project Manager",
+            "educacion_clave": ["management", "administracion", "maestria", "master", "product owner"],
+            "habilidades_clave": ["project manager", "product manager", "product owner", "customer success", "pmp", "capm", "trello", "notion", "analytics", "zendesk", "mixpanel", "google analytics", "tableau", "intercom"],
+            "certificaciones_clave": ["pmp", "capm", "google ads", "certificado", "diplomado"],
+            "min_experiencia": 2
+        },
+        "recursos_humanos": {
+            "nombre": "Recursos Humanos",
+            "educacion_clave": ["recursos humanos", "psicologia", "administracion"],
+            "habilidades_clave": ["seleccion", "entrevista", "planillas", "capacitacion", "clima laboral"],
+            "certificaciones_clave": ["gestion del talento", "planillas", "legislacion laboral"],
+            "min_experiencia": 1
+        },
+        "atencion_ciudadano": {
+            "nombre": "Atención al Ciudadano",
+            "educacion_clave": ["administracion", "comunicacion", "secretariado"],
+            "habilidades_clave": ["atencion al cliente", "atencion al ciudadano", "comunicacion", "reclamos", "orientacion", "mesa de partes"],
+            "certificaciones_clave": ["atencion al cliente", "calidad de servicio"],
+            "min_experiencia": 0
+        },
+        "seguridad_ciudadana": {
+            "nombre": "Seguridad Ciudadana",
+            "educacion_clave": ["seguridad", "serenazgo", "policia", "prevencion"],
+            "habilidades_clave": ["serenazgo", "patrullaje", "primeros auxilios", "prevencion", "control"],
+            "certificaciones_clave": ["primeros auxilios", "seguridad ciudadana", "defensa civil"],
+            "min_experiencia": 0
+        },
+        "logistica": {
+            "nombre": "Logística Municipal",
+            "educacion_clave": ["logistica", "administracion", "abastecimiento"],
+            "habilidades_clave": ["compras", "almacen", "contrataciones", "seace", "siga", "inventario"],
+            "certificaciones_clave": ["contrataciones del estado", "seace", "siga"],
+            "min_experiencia": 1
+        }
+    }
+
+    ruta = _ruta_puestos_json()
+    try:
+        if os.path.exists(ruta):
+            with open(ruta, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict) and data:
+                    return data
+    except Exception as e:
+        print("No se pudo cargar data/puestos.json. Usando puestos internos:", e)
+
+    return puestos_default
+
+
+def extraer_texto_cv(ruta, extension):
+    """Extrae texto real del CV. Usa docx2txt para DOCX y fallback con XML interno."""
+    texto = ""
+
+    try:
+        if extension == "pdf":
+            reader = PdfReader(ruta)
+            for page in reader.pages:
+                texto += page.extract_text() or ""
+
+        elif extension == "docx":
+            try:
+                texto = docx2txt.process(ruta) or ""
+            except Exception as e:
+                print("docx2txt falló, usando fallback python-docx:", e)
+
+            if not texto.strip():
+                try:
+                    doc = DocxDocument(ruta)
+                    partes = []
+                    partes.extend(p.text for p in doc.paragraphs if p.text.strip())
+                    for table in doc.tables:
+                        for row in table.rows:
+                            for cell in row.cells:
+                                if cell.text.strip():
+                                    partes.append(cell.text.strip())
+                    texto = "\n".join(partes)
+                except Exception as e:
+                    print("python-docx falló:", e)
+
+            if not texto.strip():
+                try:
+                    with zipfile.ZipFile(ruta) as z:
+                        xml = z.read("word/document.xml").decode("utf-8", errors="ignore")
+                        texto = re.sub(r"<[^>]+>", " ", xml)
+                except Exception as e:
+                    print("fallback XML DOCX falló:", e)
+
+        elif extension in ["txt", "csv"]:
+            with open(ruta, "r", encoding="utf-8", errors="ignore") as f:
+                texto = f.read()
+
+    except Exception as e:
+        print("ERROR EXTRAYENDO CV:", e)
+
+    texto = re.sub(r"\s+", " ", texto).strip()
+    print("========== TEXTO CV EXTRAÍDO ==========")
+    print(texto[:2000])
+    print("========== FIN TEXTO CV ==========")
+    return texto
+
+
+def analizar_cv_por_puesto(texto, puesto_key):
+    puestos = cargar_puestos()
+    perfil = puestos.get(puesto_key) or puestos.get("project_manager") or next(iter(puestos.values()))
+
+    texto_original = texto or ""
+    texto_lower = _normalizar_texto(texto_original)
+
+    # Datos personales
+    correo = "No detectado"
+    telefono = "No detectado"
+    correo_match = re.search(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", texto_original)
+    if correo_match:
+        correo = correo_match.group(0)
+
+    telefono_match = re.search(r"(\+?\d[\d\s]{7,}\d)", texto_original)
+    if telefono_match:
+        telefono = telefono_match.group(0).strip()
+
+    # Nombre detectado opcional
+    nombre_detectado = "No detectado"
+    nombre_match = re.search(r"\b([A-ZÁÉÍÓÚÑ]{3,}\s+[A-ZÁÉÍÓÚÑ]{3,}(?:\s+[A-ZÁÉÍÓÚÑ]{3,})?)\b", texto_original)
+    if nombre_match:
+        nombre_detectado = nombre_match.group(1).title()
+
+    # Experiencia
+    experiencia = 0
+    coincidencias = re.findall(r"(\d+)\s*(años|anos|año|ano)", texto_lower)
+    if coincidencias:
+        experiencia = max(int(c[0]) for c in coincidencias)
+
+    # Detectar rangos tipo 02/2016 - Presente o 01/2014 - 02/2016
+    rangos = re.findall(r"(\d{1,2})/(\d{4})\s*-\s*(presente|actualidad|\d{1,2}/\d{4})", texto_lower)
+    total_anios = 0
+    for _mes_inicio, anio_inicio, fin in rangos:
+        anio_inicio = int(anio_inicio)
+        if fin in ["presente", "actualidad"]:
+            anio_fin = datetime.now().year
+        else:
+            anio_fin = int(fin.split("/")[-1])
+        total_anios += max(0, anio_fin - anio_inicio)
+    experiencia = max(experiencia, total_anios)
+
+    # Si el propio CV declara experiencia resumida
+    if "15 anos" in texto_lower or "15 años" in texto_lower:
+        experiencia = max(experiencia, 15)
+
+    # Educación
+    educacion = "secundaria"
+    educacion_detectada = []
+    formaciones = {
+        "Master in Management": ["master in management"],
+        "Maestría en Administración": ["maestria en administracion", "maestría en administración"],
+        "Universidad": ["universidad"],
+        "Bachiller": ["bachiller"],
+        "Técnico": ["tecnico", "técnico"]
+    }
+    for etiqueta, claves in formaciones.items():
+        if any(_normalizar_texto(c) in texto_lower for c in claves):
+            educacion_detectada.append(etiqueta)
+
+    if any(x in texto_lower for x in ["maestria", "master", "postgrado"]):
+        educacion = "postgrado"
+    elif any(x in texto_lower for x in ["universidad", "universitario", "bachiller"]):
+        educacion = "universitario"
+    elif any(x in texto_lower for x in ["tecnico"]):
+        educacion = "tecnico"
+
+    # Idiomas
+    idiomas_detectados = []
+    for idioma in ["inglés", "ingles", "español", "espanol", "portugués", "portugues", "francés", "frances"]:
+        if _normalizar_texto(idioma) in texto_lower:
+            etiqueta = idioma.replace("ingles", "inglés").replace("espanol", "español").title()
+            if etiqueta not in idiomas_detectados:
+                idiomas_detectados.append(etiqueta)
+
+    # Certificaciones
+    posibles_certificaciones = [
+        "PMP", "PMPs", "CAPM", "CAPMs", "Google Ads", "Campañas de búsqueda",
+        "Campañas de Shopping", "Diplomado", "Certificado", "Certificación"
+    ]
+    certificaciones_detectadas = []
+    for cert in posibles_certificaciones:
+        if _normalizar_texto(cert) in texto_lower:
+            certificaciones_detectadas.append(cert)
+
+    # Hard skills generales
+    skills_generales = [
+        "Tableau", "Mixpanel", "Google Analytics 360", "Google Analytics", "Notion", "Trello",
+        "Zendesk", "Intercom", "Excel", "Word", "SQL", "Python", "Java", "Power BI",
+        "AutoCAD", "SIAF", "SIGA", "SEACE", "PHP", "JavaScript", "MySQL"
+    ]
+    hard_skills_detectadas = []
+    for skill in skills_generales:
+        if _normalizar_texto(skill) in texto_lower:
+            hard_skills_detectadas.append(skill)
+
+    # Experiencia relevante/cargos
+    cargos_clave = [
+        "Ecommerce Product Owner", "Product Owner", "Product Manager", "Project Manager",
+        "Customer Success Manager", "Customer Success", "Agente de Servicio al cliente",
+        "Administrador", "Abogado", "Contador", "Ingeniero Civil", "Arquitecto", "Programador"
+    ]
+    experiencia_relevante = []
+    for cargo in cargos_clave:
+        if _normalizar_texto(cargo) in texto_lower:
+            experiencia_relevante.append(cargo)
+
+    # Coincidencias contra perfil del puesto
+    edu_match = sum(1 for p in perfil.get("educacion_clave", []) if _normalizar_texto(p) in texto_lower)
+    hab_match = sum(1 for p in perfil.get("habilidades_clave", []) if _normalizar_texto(p) in texto_lower)
+    cert_match = sum(1 for p in perfil.get("certificaciones_clave", []) if _normalizar_texto(p) in texto_lower)
+
+    habilidades = max(hab_match, len(hard_skills_detectadas))
+    certificaciones = max(cert_match, len(certificaciones_detectadas))
+
+    # Score base explicable
+    puntaje = 0
+    if experiencia >= int(perfil.get("min_experiencia", 0)):
+        puntaje += 25
+    puntaje += min(edu_match * 15, 25)
+    puntaje += min(hab_match * 7, 35)
+    puntaje += min(cert_match * 5, 15)
+    if len(idiomas_detectados) >= 2:
+        puntaje += 10
+
+    # Reglas fuertes por puesto
+    if puesto_key == "project_manager":
+        if any(x in texto_lower for x in ["project manager", "product manager", "product owner", "customer success"]):
+            puntaje += 25
+        if any(x in texto_lower for x in ["pmp", "capm"]):
+            puntaje += 15
+        if any(x in texto_lower for x in ["google analytics", "trello", "notion", "mixpanel", "tableau", "zendesk"]):
+            puntaje += 15
+
+    if puesto_key == "abogado":
+        if not any(x in texto_lower for x in ["derecho", "abogado", "juridico", "legal", "leyes"]):
+            puntaje = min(puntaje, 35)
+
+    puntaje = int(min(puntaje, 100))
+    resultado = "apto" if puntaje >= 60 else "no_apto"
+
+    explicacion = []
+    explicacion.append("ANÁLISIS INTELIGENTE DEL CURRÍCULUM VITAE")
+    explicacion.append(f"Nombre detectado: {nombre_detectado}.")
+    explicacion.append(f"Correo detectado: {correo}.")
+    explicacion.append(f"Teléfono detectado: {telefono}.")
+    explicacion.append(f"Experiencia estimada: {experiencia} años.")
+    explicacion.append(f"Nivel educativo detectado: {educacion}.")
+
+    if educacion_detectada:
+        explicacion.append("Formación detectada: " + ", ".join(educacion_detectada) + ".")
+    if idiomas_detectados:
+        explicacion.append("Idiomas detectados: " + ", ".join(idiomas_detectados) + ".")
+    if certificaciones_detectadas:
+        explicacion.append("Certificaciones detectadas: " + ", ".join(certificaciones_detectadas) + ".")
+    if hard_skills_detectadas:
+        explicacion.append("Hard skills detectadas: " + ", ".join(hard_skills_detectadas) + ".")
+    if experiencia_relevante:
+        explicacion.append("Experiencia relevante detectada: " + ", ".join(experiencia_relevante) + ".")
+
+    explicacion.append(f"Compatibilidad con el puesto {perfil.get('nombre', puesto_key)}: {puntaje}%.")
+    if resultado == "apto":
+        explicacion.append(
+            f"Conclusión: APTO para el puesto de {perfil.get('nombre', puesto_key)}, debido a la coincidencia entre experiencia, formación, certificaciones y habilidades del CV."
+        )
+    else:
+        explicacion.append(
+            f"Conclusión: NO APTO para el puesto de {perfil.get('nombre', puesto_key)}, porque el CV no evidencia suficientes coincidencias con el perfil requerido."
+        )
+
+    return {
+        "experiencia": experiencia,
+        "educacion": educacion,
+        "habilidades": habilidades,
+        "certificaciones": certificaciones,
+        "puntaje": puntaje,
+        "resultado": resultado,
+        "probabilidad": puntaje / 100,
+        "explicacion": "\n".join(explicacion)
+    }
 
 
 if __name__ == '__main__':

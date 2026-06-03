@@ -1,74 +1,457 @@
 {% extends 'base.html' %}
 
 {% block contenido %}
-<h4 class="mb-4"><i class="bi bi-speedometer2"></i> Dashboard — Panel Administrativo</h4>
+<style>
+/* ── Variables institucionales ─────────────────────────────────── */
+:root {
+  --verde:       #1B5E35;
+  --verde-med:   #2E7D4F;
+  --verde-claro: #E8F5EE;
+  --rojo-inst:   #C62828;
+  --dorado:      #B8860B;
+  --gris-100:    #F8F9FA;
+  --gris-200:    #EEF0F2;
+  --gris-600:    #5A6272;
+  --sombra-sm:   0 2px 8px rgba(0,0,0,.07);
+  --sombra-md:   0 4px 20px rgba(0,0,0,.10);
+  --radio:       10px;
+}
 
-<div class="row g-3 mb-4">
-    <div class="col-md-3">
-        <div class="card card-stat p-3 text-center">
-            <div class="text-muted small">Trámites hoy</div>
-            <div class="fs-2 fw-bold text-primary">{{ total_tramites }}</div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card card-stat p-3 text-center">
-            <div class="text-muted small">Críticos</div>
-            <div class="fs-2 fw-bold text-danger">{{ criticos }}</div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card card-stat p-3 text-center">
-            <div class="text-muted small">CVs evaluados</div>
-            <div class="fs-2 fw-bold text-success">{{ postulantes }}</div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card card-stat p-3 text-center">
-            <div class="text-muted small">Alertas pendientes</div>
-            <div class="fs-2 fw-bold text-warning">{{ alertas }}</div>
-        </div>
-    </div>
+/* ── KPI Cards ─────────────────────────────────────────────────── */
+.kpi-card {
+  background: #fff;
+  border-radius: var(--radio);
+  border: 1px solid var(--gris-200);
+  box-shadow: var(--sombra-sm);
+  padding: 22px 24px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  transition: box-shadow .2s, transform .2s;
+}
+.kpi-card:hover { box-shadow: var(--sombra-md); transform: translateY(-2px); }
+.kpi-icon {
+  width: 54px; height: 54px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0;
+}
+.kpi-icon.azul   { background: #E3F0FF; color: #1565C0; }
+.kpi-icon.rojo   { background: #FEECEC; color: #C62828; }
+.kpi-icon.verde  { background: var(--verde-claro); color: var(--verde); }
+.kpi-icon.naranja{ background: #FFF3E0; color: #E65100; }
+.kpi-valor { font-size: 2rem; font-weight: 700; line-height: 1; color: #1a1a2e; }
+.kpi-label { font-size: 12px; color: var(--gris-600); margin-top: 3px; text-transform: uppercase; letter-spacing: .04em; }
+.kpi-tendencia { font-size: 11px; margin-top: 5px; }
+
+/* ── Sección títulos ───────────────────────────────────────────── */
+.sec-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.sec-title {
+  font-size: 15px; font-weight: 600; color: #1a1a2e;
+  display: flex; align-items: center; gap: 8px;
+}
+.sec-title::before {
+  content: '';
+  display: inline-block;
+  width: 4px; height: 18px;
+  background: var(--verde-med);
+  border-radius: 2px;
+}
+
+/* ── Tabla principal ───────────────────────────────────────────── */
+.tabla-inst thead th {
+  background: var(--verde);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  padding: 12px 16px;
+  border: none;
+  white-space: nowrap;
+}
+.tabla-inst tbody tr {
+  border-bottom: 1px solid var(--gris-200);
+  transition: background .15s;
+}
+.tabla-inst tbody tr:hover { background: var(--gris-100); }
+.tabla-inst tbody td {
+  padding: 12px 16px;
+  vertical-align: middle;
+  font-size: 13px;
+  color: #333;
+}
+
+/* ── Badges de prioridad ───────────────────────────────────────── */
+.badge-critico {
+  background: #FEECEC; color: #C62828;
+  border: 1px solid #FFCDD2;
+  font-size: 11px; font-weight: 600;
+  padding: 3px 10px; border-radius: 20px;
+  letter-spacing: .03em;
+}
+.badge-normal {
+  background: #FFF8E1; color: #E65100;
+  border: 1px solid #FFE082;
+  font-size: 11px; font-weight: 600;
+  padding: 3px 10px; border-radius: 20px;
+}
+.badge-bajo {
+  background: var(--verde-claro); color: var(--verde);
+  border: 1px solid #A5D6A7;
+  font-size: 11px; font-weight: 600;
+  padding: 3px 10px; border-radius: 20px;
+}
+
+/* ── Badges de estado ──────────────────────────────────────────── */
+.estado-pendiente  { background:#FFF8E1; color:#E65100; border:1px solid #FFE082; }
+.estado-en_proceso { background:#E3F0FF; color:#1565C0; border:1px solid #BBDEFB; }
+.estado-aprobado   { background:#E8F5EE; color:#1B5E35; border:1px solid #A5D6A7; }
+.estado-rechazado  { background:#FEECEC; color:#C62828; border:1px solid #FFCDD2; }
+.estado-badge {
+  font-size: 11px; font-weight: 600;
+  padding: 3px 10px; border-radius: 20px;
+  letter-spacing: .03em; display: inline-block;
+}
+
+/* ── Panel lateral acciones ────────────────────────────────────── */
+.accion-card {
+  background: #fff;
+  border: 1px solid var(--gris-200);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra-sm);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.accion-header {
+  background: var(--verde-claro);
+  padding: 12px 16px;
+  font-size: 13px; font-weight: 600; color: var(--verde);
+  border-bottom: 1px solid #C8E6C9;
+}
+.accion-body { padding: 14px 16px; }
+.accion-btn {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--gris-200);
+  background: #fff;
+  color: #333;
+  font-size: 13px;
+  text-decoration: none;
+  margin-bottom: 8px;
+  transition: all .15s;
+  width: 100%;
+}
+.accion-btn:last-child { margin-bottom: 0; }
+.accion-btn:hover { background: var(--verde-claro); border-color: #A5D6A7; color: var(--verde); text-decoration: none; }
+.accion-btn i { font-size: 16px; color: var(--verde-med); }
+
+/* ── Info institucional ─────────────────────────────────────────── */
+.inst-info {
+  background: linear-gradient(135deg, var(--verde) 0%, #1a4d2e 100%);
+  border-radius: var(--radio);
+  padding: 20px 22px;
+  color: #fff;
+  margin-bottom: 16px;
+}
+.inst-info h6 { color: #a8d5ba; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+.inst-info p  { font-size: 13px; margin: 0; color: rgba(255,255,255,.85); }
+
+/* ── Gráfica mini barras ────────────────────────────────────────── */
+.mini-bar-wrap { display:flex; align-items:flex-end; gap:5px; height:50px; padding-top:4px; }
+.mini-bar {
+  flex: 1; border-radius: 4px 4px 0 0;
+  background: var(--verde-med);
+  transition: opacity .2s;
+  min-height: 4px;
+}
+.mini-bar:hover { opacity: .75; }
+
+/* ── Avatar ciudadano ───────────────────────────────────────────── */
+.avatar-sm {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background: var(--verde-claro);
+  color: var(--verde);
+  font-size: 12px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+</style>
+
+<!-- ══ CABECERA DE PÁGINA ══════════════════════════════════════════ -->
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <h4 class="fw-bold mb-1" style="color:#1a1a2e; font-size:20px;">
+      Panel de Control Administrativo
+    </h4>
+    <p class="text-muted mb-0" style="font-size:13px;">
+      <i class="bi bi-calendar3 me-1"></i>
+      {{ now.strftime('%A, %d de %B de %Y') if now else '' }} &nbsp;·&nbsp;
+      Municipalidad Provincial de Yau
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('exportar_tramites_excel') }}"
+       class="btn btn-sm btn-outline-success d-flex align-items-center gap-1">
+      <i class="bi bi-file-earmark-excel"></i> Exportar Excel
+    </a>
+    <a href="{{ url_for('ml_stats') }}"
+       class="btn btn-sm btn-success d-flex align-items-center gap-1">
+      <i class="bi bi-cpu"></i> Dashboard ML
+    </a>
+  </div>
 </div>
 
-<div class="card shadow-sm">
-    <div class="card-header bg-institucional text-white">
-        <i class="bi bi-clock-history"></i> Últimos trámites registrados
+<!-- ══ KPI CARDS ═══════════════════════════════════════════════════ -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon azul"><i class="bi bi-folder2-open"></i></div>
+      <div>
+        <div class="kpi-valor">{{ total_tramites }}</div>
+        <div class="kpi-label">Total trámites</div>
+        <div class="kpi-tendencia text-muted"><i class="bi bi-arrow-up-right text-success"></i> Registrados</div>
+      </div>
     </div>
-    <div class="card-body p-0">
-        <table class="table table-hover mb-0">
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon rojo"><i class="bi bi-exclamation-triangle"></i></div>
+      <div>
+        <div class="kpi-valor" style="color:#C62828;">{{ criticos }}</div>
+        <div class="kpi-label">Trámites críticos</div>
+        <div class="kpi-tendencia" style="color:#C62828;"><i class="bi bi-lightning-fill"></i> Requieren atención</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon verde"><i class="bi bi-person-badge"></i></div>
+      <div>
+        <div class="kpi-valor" style="color:var(--verde);">{{ postulantes }}</div>
+        <div class="kpi-label">CVs evaluados</div>
+        <div class="kpi-tendencia text-muted"><i class="bi bi-robot text-success"></i> Por modelo ML</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon naranja"><i class="bi bi-bell"></i></div>
+      <div>
+        <div class="kpi-valor" style="color:#E65100;">{{ alertas }}</div>
+        <div class="kpi-label">Alertas pendientes</div>
+        <div class="kpi-tendencia text-muted"><i class="bi bi-dot"></i> Sin leer</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CONTENIDO PRINCIPAL ════════════════════════════════════════ -->
+<div class="row g-3">
+
+  <!-- Tabla de últimos trámites -->
+  <div class="col-lg-8">
+    <div class="accion-card">
+      <div class="accion-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-clock-history me-2"></i>Últimos trámites registrados</span>
+        <a href="{{ url_for('tramites') }}" class="text-success" style="font-size:12px;text-decoration:none;">
+          Ver todos <i class="bi bi-arrow-right"></i>
+        </a>
+      </div>
+      <div class="p-0">
+        <div class="table-responsive">
+          <table class="tabla-inst table mb-0">
             <thead>
-                <tr>
-                    <th>Ciudadano</th>
-                    <th>Tipo</th>
-                    <th>Urgencia</th>
-                    <th>Prioridad ML</th>
-                    <th>Estado</th>
-                    <th>Fecha</th>
-                </tr>
+              <tr>
+                <th>#</th>
+                <th>Ciudadano</th>
+                <th>Tipo de trámite</th>
+                <th>Prioridad IA</th>
+                <th>Estado</th>
+                <th>Fecha</th>
+                <th></th>
+              </tr>
             </thead>
             <tbody>
-                {% for t in tramites %}
-                <tr>
-                    <td>{{ t.ciudadano.nombre }}</td>
-                    <td>{{ t.tipo.replace('_', ' ').title() }}</td>
-                    <td>{{ t.urgencia.title() }}</td>
-                    <td>
-                        <span class="badge-{{ t.prioridad_ml }}">
-                            {{ t.prioridad_ml.upper() }}
-                        </span>
-                    </td>
-                    <td>{{ t.estado.replace('_', ' ').title() }}</td>
-                    <td>{{ t.fecha_registro.strftime('%d/%m/%Y') }}</td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="6" class="text-center text-muted py-3">
-                        No hay trámites registrados aún.
-                    </td>
-                </tr>
-                {% endfor %}
+              {% for t in tramites %}
+              <tr>
+                <td class="text-muted fw-semibold" style="font-size:12px;">{{ t.id }}</td>
+                <td>
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="avatar-sm">{{ t.ciudadano.nombre[0].upper() }}</div>
+                    <div>
+                      <div class="fw-semibold" style="font-size:13px;">{{ t.ciudadano.nombre }}</div>
+                      {% if t.ciudadano.dni %}
+                      <div class="text-muted" style="font-size:11px;">DNI: {{ t.ciudadano.dni }}</div>
+                      {% endif %}
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <span style="font-size:13px;">{{ t.tipo.replace('_', ' ').title() }}</span>
+                </td>
+                <td>
+                  <span class="badge-{{ t.prioridad_ml }}">
+                    {% if t.prioridad_ml == 'critico' %}<i class="bi bi-exclamation-circle me-1"></i>{% endif %}
+                    {{ t.prioridad_ml.upper() }}
+                  </span>
+                </td>
+                <td>
+                  <span class="estado-badge estado-{{ t.estado }}">
+                    {{ t.estado.replace('_',' ').title() }}
+                  </span>
+                </td>
+                <td class="text-muted" style="font-size:12px;">
+                  {{ t.fecha_registro.strftime('%d/%m/%Y') }}<br>
+                  <span style="font-size:11px;">{{ t.fecha_registro.strftime('%H:%M') }}</span>
+                </td>
+                <td>
+                  <a href="{{ url_for('detalle_tramite', id=t.id) }}"
+                     class="btn btn-sm btn-outline-success" style="font-size:11px;padding:3px 10px;">
+                    <i class="bi bi-eye"></i>
+                  </a>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="7" class="text-center py-5 text-muted">
+                  <i class="bi bi-inbox display-6 d-block mb-2 opacity-25"></i>
+                  No hay trámites registrados aún.
+                </td>
+              </tr>
+              {% endfor %}
             </tbody>
-        </table>
+          </table>
+        </div>
+      </div>
     </div>
+
+    <!-- Distribución por estado (barras mini) -->
+    {% if tramites %}
+    <div class="accion-card mt-3">
+      <div class="accion-header">
+        <i class="bi bi-bar-chart me-2"></i>Distribución por prioridad ML
+      </div>
+      <div class="accion-body">
+        {% set n_critico = tramites | selectattr('prioridad_ml','eq','critico') | list | length %}
+        {% set n_normal  = tramites | selectattr('prioridad_ml','eq','normal')  | list | length %}
+        {% set n_bajo    = tramites | selectattr('prioridad_ml','eq','bajo')    | list | length %}
+        {% set total_vis = (n_critico + n_normal + n_bajo) or 1 %}
+        <div class="row g-3 text-center">
+          <div class="col-4">
+            <div class="fw-bold" style="font-size:22px;color:#C62828;">{{ n_critico }}</div>
+            <div class="progress mt-1" style="height:6px;border-radius:4px;">
+              <div class="progress-bar bg-danger" style="width:{{ (n_critico/total_vis*100)|round }}%"></div>
+            </div>
+            <div class="text-muted mt-1" style="font-size:11px;">CRÍTICO</div>
+          </div>
+          <div class="col-4">
+            <div class="fw-bold" style="font-size:22px;color:#E65100;">{{ n_normal }}</div>
+            <div class="progress mt-1" style="height:6px;border-radius:4px;">
+              <div class="progress-bar bg-warning" style="width:{{ (n_normal/total_vis*100)|round }}%"></div>
+            </div>
+            <div class="text-muted mt-1" style="font-size:11px;">NORMAL</div>
+          </div>
+          <div class="col-4">
+            <div class="fw-bold" style="font-size:22px;color:var(--verde);">{{ n_bajo }}</div>
+            <div class="progress mt-1" style="height:6px;border-radius:4px;">
+              <div class="progress-bar bg-success" style="width:{{ (n_bajo/total_vis*100)|round }}%"></div>
+            </div>
+            <div class="text-muted mt-1" style="font-size:11px;">BAJO</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Panel lateral -->
+  <div class="col-lg-4">
+
+    <!-- Info institucional -->
+    <div class="inst-info">
+      <h6>Municipalidad Provincial de Yau</h6>
+      <p class="fw-semibold mb-1" style="font-size:15px;">GestiMuni Huánuco</p>
+      <p>Sistema de Gestión Municipal con Inteligencia Artificial</p>
+      <hr style="border-color:rgba(255,255,255,.2);margin:12px 0;">
+      <div class="d-flex justify-content-between" style="font-size:12px;color:rgba(255,255,255,.7);">
+        <span><i class="bi bi-robot me-1"></i>IA activa</span>
+        <span><i class="bi bi-shield-check me-1"></i>Sistema seguro</span>
+        <span><i class="bi bi-bell me-1"></i>Alertas ON</span>
+      </div>
+    </div>
+
+    <!-- Acciones rápidas -->
+    <div class="accion-card">
+      <div class="accion-header"><i class="bi bi-lightning me-2"></i>Acciones rápidas</div>
+      <div class="accion-body">
+        <a href="{{ url_for('tramites') }}" class="accion-btn">
+          <i class="bi bi-folder2-open"></i>
+          <div><div class="fw-semibold" style="font-size:13px;">Ver todos los trámites</div>
+               <div class="text-muted" style="font-size:11px;">Gestionar solicitudes</div></div>
+        </a>
+        <a href="{{ url_for('curriculos') }}" class="accion-btn">
+          <i class="bi bi-person-badge"></i>
+          <div><div class="fw-semibold" style="font-size:13px;">Evaluar currículos</div>
+               <div class="text-muted" style="font-size:11px;">Clasificación automática ML</div></div>
+        </a>
+        <a href="{{ url_for('usuarios') }}" class="accion-btn">
+          <i class="bi bi-people"></i>
+          <div><div class="fw-semibold" style="font-size:13px;">Gestión de usuarios</div>
+               <div class="text-muted" style="font-size:11px;">Admin, empleados y ciudadanos</div></div>
+        </a>
+        <a href="{{ url_for('ml_stats') }}" class="accion-btn">
+          <i class="bi bi-cpu"></i>
+          <div><div class="fw-semibold" style="font-size:13px;">Dashboard de IA</div>
+               <div class="text-muted" style="font-size:11px;">Métricas y precisión del modelo</div></div>
+        </a>
+        <a href="{{ url_for('alertas') }}" class="accion-btn">
+          <i class="bi bi-bell"></i>
+          <div><div class="fw-semibold" style="font-size:13px;">Centro de alertas</div>
+               <div class="text-muted" style="font-size:11px;">Notificaciones pendientes</div></div>
+        </a>
+        <a href="{{ url_for('exportar_tramites_excel') }}" class="accion-btn">
+          <i class="bi bi-file-earmark-excel"></i>
+          <div><div class="fw-semibold" style="font-size:13px;">Exportar reporte Excel</div>
+               <div class="text-muted" style="font-size:11px;">Formato institucional</div></div>
+        </a>
+      </div>
+    </div>
+
+    <!-- Resumen rápido -->
+    <div class="accion-card">
+      <div class="accion-header"><i class="bi bi-info-circle me-2"></i>Resumen del sistema</div>
+      <div class="accion-body p-0">
+        <ul class="list-group list-group-flush" style="font-size:13px;">
+          <li class="list-group-item d-flex justify-content-between align-items-center px-3 py-2">
+            <span class="text-muted">Trámites totales</span>
+            <strong>{{ total_tramites }}</strong>
+          </li>
+          <li class="list-group-item d-flex justify-content-between align-items-center px-3 py-2">
+            <span class="text-muted">Prioridad crítica</span>
+            <span class="badge-critico">{{ criticos }}</span>
+          </li>
+          <li class="list-group-item d-flex justify-content-between align-items-center px-3 py-2">
+            <span class="text-muted">CVs evaluados</span>
+            <strong>{{ postulantes }}</strong>
+          </li>
+          <li class="list-group-item d-flex justify-content-between align-items-center px-3 py-2">
+            <span class="text-muted">Alertas sin leer</span>
+            {% if alertas > 0 %}
+            <span class="badge bg-warning text-dark" style="font-size:11px;">{{ alertas }}</span>
+            {% else %}
+            <span class="text-success" style="font-size:12px;"><i class="bi bi-check-circle"></i> Al día</span>
+            {% endif %}
+          </li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
 </div>
 {% endblock %}

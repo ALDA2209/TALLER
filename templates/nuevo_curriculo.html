@@ -1,55 +1,103 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
+{% block title %}Nuevo Currículo — GestiMuni{% endblock %}
 
 {% block contenido %}
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card shadow-sm">
-            <div class="card-header bg-institucional text-white">
-                <i class="bi bi-person-plus"></i> Registrar Nuevo Currículo
-            </div>
-            <div class="card-body p-4">
-                <form method="POST">
-                    <div class="mb-3">
-                        <label class="form-label">Nombre del Postulante</label>
-                        <input type="text" name="nombre" class="form-control"
-                            placeholder="Nombre completo" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Puesto al que Postula</label>
-                        <input type="text" name="puesto" class="form-control"
-                            placeholder="Ej: Secretaria, Técnico, Abogado" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Años de Experiencia</label>
-                        <input type="number" name="experiencia" class="form-control"
-                            min="0" max="40" placeholder="0" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Nivel de Educación</label>
-                        <select name="educacion" class="form-select" required>
-                            <option value="">-- Selecciona --</option>
-                            <option value="secundaria">Secundaria</option>
-                            <option value="tecnico">Técnico</option>
-                            <option value="universitario">Universitario</option>
-                            <option value="postgrado">Postgrado</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Número de Habilidades</label>
-                        <input type="number" name="habilidades" class="form-control"
-                            min="0" max="20" placeholder="Ej: 5" required>
-                    </div>
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-institucional w-100">
-                            <i class="bi bi-cpu"></i> Evaluar con ML
-                        </button>
-                        <a href="{{ url_for('curriculos') }}" class="btn btn-outline-secondary w-100">
-                            Cancelar
-                        </a>
-                    </div>
-                </form>
-            </div>
+<div class="container py-4" style="max-width:780px;">
+
+  <div class="mb-4">
+    <h3 class="fw-bold">
+      <i class="bi bi-person-badge text-success"></i>
+      Evaluación inteligente de currículo
+    </h3>
+    <p class="text-muted">
+      Suba el CV del postulante. El sistema detectará experiencia, educación,
+      habilidades y compatibilidad con el puesto.
+    </p>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+
+      <form method="POST" enctype="multipart/form-data">
+
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-semibold">Nombre del postulante</label>
+            <input type="text" name="nombre" class="form-control" required>
+          </div>
+
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-semibold">Puesto al que postula</label>
+            <select name="puesto" class="form-select" required>
+                <option value="">Seleccione un puesto</option>
+                <option value="abogado">Abogado Municipal</option>
+                <option value="contador">Contador Municipal</option>
+                <option value="administrador">Administrador Público</option>
+                <option value="secretaria">Secretaria Administrativa</option>
+                <option value="asistente_administrativo">Asistente Administrativo</option>
+                <option value="ingeniero_civil">Ingeniero Civil</option>
+                <option value="arquitecto">Arquitecto Municipal</option>
+                <option value="tecnico_informatica">Técnico en Informática</option>
+                <option value="programador">Programador / Desarrollador</option>
+                <option value="project_manager">Project Manager</option>
+                <option value="recursos_humanos">Recursos Humanos</option>
+                <option value="atencion_ciudadano">Atención al Ciudadano</option>
+                <option value="seguridad_ciudadana">Seguridad Ciudadana</option>
+                <option value="logistica">Logística Municipal</option>
+            
+          </div>
         </div>
+
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-semibold">DNI</label>
+            <input type="text"
+                   name="dni"
+                   class="form-control"
+                   maxlength="8"
+                   minlength="8"
+                   pattern="[0-9]{8}"
+                   placeholder="Ingrese 8 dígitos"
+                   required>
+            <div class="form-text">El DNI debe contener exactamente 8 números.</div>
+          </div>
+
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-semibold">Correo</label>
+            <input type="email" name="email" class="form-control" placeholder="correo@ejemplo.com">
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label fw-semibold">Currículum Vitae</label>
+          <input type="file"
+                 name="archivo_cv"
+                 class="form-control"
+                 accept=".pdf,.docx,.txt,.csv"
+                 required>
+          <div class="form-text">
+            Formatos permitidos: PDF, DOCX, TXT o CSV. El sistema analizará automáticamente el contenido.
+          </div>
+        </div>
+
+        <div class="alert alert-success">
+          <i class="bi bi-cpu"></i>
+          La IA evaluará el CV comparándolo con los requisitos del puesto seleccionado.
+        </div>
+
+        <div class="d-flex gap-2">
+          <button class="btn btn-success">
+            <i class="bi bi-cpu"></i>
+            Evaluar CV con IA
+          </button>
+
+          <a href="{{ url_for('curriculos') }}" class="btn btn-outline-secondary">
+            Cancelar
+          </a>
+        </div>
+
+      </form>
     </div>
+  </div>
 </div>
 {% endblock %}

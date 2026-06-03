@@ -1,67 +1,194 @@
 {% extends 'base.html' %}
 
-{% block contenido %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h4><i class="bi bi-person-badge"></i> Evaluación de Currículos</h4>
-    <a href="{{ url_for('nuevo_curriculo') }}" class="btn btn-institucional">
-        <i class="bi bi-plus-circle"></i> Nuevo CV
-    </a>
-</div>
+{% block title %}Currículos — GestiMuni{% endblock %}
 
-<div class="card shadow-sm">
-    <div class="card-body p-0">
-        <table class="table table-hover mb-0">
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Nombre</th>
-                    <th>Puesto</th>
-                    <th>Experiencia</th>
-                    <th>Educación</th>
-                    <th>Habilidades</th>
-                    <th>Puntaje ML</th>
-                    <th>Resultado ML</th>
-                    <th>Fecha</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for p in postulantes %}
-                <tr>
-                    <td>{{ p.id }}</td>
-                    <td>{{ p.nombre }}</td>
-                    <td>{{ p.puesto }}</td>
-                    <td>{{ p.experiencia }} años</td>
-                    <td>{{ p.educacion.title() }}</td>
-                    <td>{{ p.habilidades }}</td>
-                    <td>
-                        <div class="progress" style="height:20px;">
-                            <div class="progress-bar 
-                                {% if p.puntaje_ml >= 70 %}bg-success
-                                {% elif p.puntaje_ml >= 40 %}bg-warning
-                                {% else %}bg-danger{% endif %}"
-                                style="width:{{ p.puntaje_ml }}%">
-                                {{ p.puntaje_ml }}%
-                            </div>
-                        </div>
-                    </td>
-                    <td>
-                        {% if p.resultado_ml == 'apto' %}
-                        <span class="badge-bajo">APTO</span>
-                        {% else %}
-                        <span class="badge-critico">NO APTO</span>
-                        {% endif %}
-                    </td>
-                    <td>{{ p.fecha_registro.strftime('%d/%m/%Y') }}</td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="9" class="text-center text-muted py-3">
-                        No hay currículos registrados aún.
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+{% block contenido %}
+<div class="container-fluid py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h3 class="fw-bold mb-1">
+        <i class="bi bi-person-badge text-success"></i>
+        Evaluación inteligente de currículos
+      </h3>
+      <p class="text-muted mb-0">
+        Análisis automático de CV según el puesto seleccionado.
+      </p>
     </div>
+
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('exportar_curriculos_excel') }}" class="btn btn-outline-success">
+        <i class="bi bi-file-earmark-excel"></i>
+        Exportar Excel
+      </a>
+
+      <a href="{{ url_for('nuevo_curriculo') }}" class="btn btn-success">
+        <i class="bi bi-plus-circle"></i>
+        Nuevo CV
+      </a>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-success">
+            <tr>
+              <th class="ps-4">#</th>
+              <th>Postulante</th>
+              <th>Puesto</th>
+              <th>Experiencia</th>
+              <th>Educación</th>
+              <th>Habilidades</th>
+              <th>Puntaje IA</th>
+              <th>Resultado</th>
+              <th>Fecha</th>
+              <th class="text-center pe-4">Análisis</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {% for p in postulantes %}
+            <tr>
+              <td class="ps-4 text-muted small fw-semibold">{{ p.id }}</td>
+
+              <td>
+                <div class="fw-semibold">{{ p.nombre }}</div>
+
+                {% if p.email %}
+                <div class="text-muted" style="font-size:11px;">
+                  {{ p.email }}
+                </div>
+                {% endif %}
+
+                {% if p.dni %}
+                <div class="text-muted" style="font-size:11px;">
+                  DNI: {{ p.dni }}
+                </div>
+                {% endif %}
+              </td>
+
+              <td>
+                <span class="badge bg-light text-dark border">
+                  {{ p.puesto.replace('_', ' ').title() }}
+                </span>
+              </td>
+
+              <td>{{ p.experiencia }} años</td>
+
+              <td>{{ p.educacion.replace('_', ' ').title() }}</td>
+
+              <td>
+                <span class="badge bg-secondary">
+                  {{ p.habilidades }}
+                </span>
+              </td>
+
+              <td style="min-width:150px;">
+                <div class="progress" style="height:22px;">
+                  <div class="progress-bar
+                    {% if p.puntaje_ml >= 70 %}bg-success
+                    {% elif p.puntaje_ml >= 40 %}bg-warning text-dark
+                    {% else %}bg-danger{% endif %}"
+                    role="progressbar"
+                    style="width: {{ p.puntaje_ml }}%;">
+                    {{ p.puntaje_ml }}%
+                  </div>
+                </div>
+
+                <div class="text-muted mt-1" style="font-size:10px;">
+                  Probabilidad: {{ (p.probabilidad * 100)|round(1) }}%
+                </div>
+              </td>
+
+              <td>
+                {% if p.resultado_ml == 'apto' %}
+                  <span class="badge bg-success">
+                    <i class="bi bi-check-circle"></i>
+                    APTO
+                  </span>
+                {% else %}
+                  <span class="badge bg-danger">
+                    <i class="bi bi-x-circle"></i>
+                    NO APTO
+                  </span>
+                {% endif %}
+              </td>
+
+              <td class="small text-muted">
+                {{ p.fecha_registro.strftime('%d/%m/%Y') }}<br>
+                <span style="font-size:10px;">
+                  {{ p.fecha_registro.strftime('%H:%M') }}
+                </span>
+              </td>
+
+              <td class="text-center pe-4">
+                {% if p.texto_cv %}
+                  <button class="btn btn-sm btn-outline-success"
+                          data-bs-toggle="collapse"
+                          data-bs-target="#analisisCV{{ p.id }}">
+                    <i class="bi bi-cpu"></i>
+                    Ver IA
+                  </button>
+                {% else %}
+                  <span class="text-muted small">—</span>
+                {% endif %}
+
+                <td>
+                    <form method="POST"
+                    action="{{ url_for('eliminar_postulante', id=p.id) }}"
+                    onsubmit="return confirm('¿Eliminar este CV?');">
+                    <button class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                    </form>
+                </td>
+
+
+            {% if p.texto_cv %}
+            <tr class="collapse" id="analisisCV{{ p.id }}">
+              <td colspan="10" class="bg-light">
+                <div class="p-3">
+
+                  <h6 class="fw-bold text-success mb-2">
+                    <i class="bi bi-stars"></i>
+                    Análisis inteligente del CV
+                  </h6>
+
+                  <div class="card border-0 shadow-sm">
+                    <div class="card-body small text-muted"
+                         style="white-space:pre-line;">
+                      {{ p.texto_cv }}
+                    </div>
+                  </div>
+
+                </div>
+              </td>
+            </tr>
+            {% endif %}
+
+            {% else %}
+            <tr>
+              <td colspan="10" class="text-center text-muted py-5">
+                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                No hay currículos registrados aún.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="px-4 py-3 border-top">
+        <small class="text-muted">
+          Total: <strong>{{ postulantes|length }}</strong> currículo(s)
+        </small>
+      </div>
+
+    </div>
+  </div>
+
 </div>
 {% endblock %}

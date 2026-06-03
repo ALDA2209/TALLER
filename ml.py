@@ -314,3 +314,38 @@ def reentrenar():
         'tramites': obtener_stats_tramites(),
         'cvs':      obtener_stats_cvs(),
     }
+    
+    
+    
+
+def explicar_tramite(tipo, urgencia, prioridad, dias_resolucion=5, cantidad_documentos=1):
+    razones = []
+
+    tipo_limpio = tipo.replace("_", " ").title()
+
+    razones.append(f"Tipo de trámite evaluado: {tipo_limpio}.")
+    razones.append(f"Urgencia declarada: {urgencia.upper()}.")
+
+    if prioridad == "critico":
+        razones.append("El sistema detectó que requiere atención prioritaria.")
+    elif prioridad == "normal":
+        razones.append("El trámite presenta una carga administrativa moderada.")
+    else:
+        razones.append("El trámite corresponde a una atención regular de baja criticidad.")
+
+    if urgencia == "alta":
+        razones.append("La urgencia alta incrementa la prioridad del trámite.")
+
+    if dias_resolucion <= 3:
+        razones.append("El plazo estimado es corto, por lo que se recomienda atención rápida.")
+
+    if cantidad_documentos >= 5:
+        razones.append("La cantidad elevada de documentos aumenta la complejidad de revisión.")
+
+    if tipo in ["denuncia_peligro"]:
+        razones.append("Las denuncias de peligro pueden afectar directamente la seguridad ciudadana.")
+
+    if tipo in ["partida_nacimiento", "certificado_residencia"] and urgencia == "baja":
+        razones.append("Este tipo de trámite suele tener bajo riesgo administrativo.")
+
+    return " ".join(razones)

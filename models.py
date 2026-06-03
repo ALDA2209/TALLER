@@ -33,6 +33,7 @@ class Tramite(db.Model):
     dias_resolucion = db.Column(db.Integer, default=0)
     observaciones   = db.Column(db.Text, nullable=True)
     confianza_ml    = db.Column(db.Float, default=0.0)
+    explicacion_ml  = db.Column(db.Text, nullable=True)
     ciudadano       = db.relationship('Usuario', foreign_keys=[ciudadano_id], backref='tramites')
     empleado        = db.relationship('Usuario', foreign_keys=[empleado_id], backref='tramites_asignados')
 
@@ -64,6 +65,8 @@ class Postulante(db.Model):
     resultado_ml    = db.Column(db.String(20), default='pendiente')
     probabilidad    = db.Column(db.Float, default=0.0)
     fecha_registro  = db.Column(db.DateTime, default=datetime.utcnow)
+    archivo_cv      = db.Column(db.String(255), nullable=True)   # nombre en disco
+    texto_cv        = db.Column(db.Text, nullable=True)         # texto extraído del CV
 
 class Alerta(db.Model):
     __tablename__ = 'alertas'
