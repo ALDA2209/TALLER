@@ -1,0 +1,27 @@
+MÉTRICAS DEL MODELO DE TRÁMITES
+================================
+Accuracy: 1.00
+
+              precision    recall  f1-score   support
+
+        bajo       1.00      1.00      1.00         1
+     critico       1.00      1.00      1.00         2
+      normal       1.00      1.00      1.00         2
+
+    accuracy                           1.00         5
+   macro avg       1.00      1.00      1.00         5
+weighted avg       1.00      1.00      1.00         5
+
+
+MÉTRICAS DEL MODELO DE CURRÍCULOS
+=================================
+Accuracy: 1.00
+
+              precision    recall  f1-score   support
+
+        apto       1.00      1.00      1.00         3
+     no_apto       1.00      1.00      1.00         2
+
+    accuracy                           1.00         5
+   macro avg       1.00      1.00      1.00         5
+weighted avg       1.00      1.00      1.00         5

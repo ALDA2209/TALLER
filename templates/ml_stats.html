@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+{% block title %}Dashboard ML — GestiMuni{% endblock %}
+
+{% block contenido %}
+<div class="container-fluid py-4">
+
+  <!-- Encabezado -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2 class="fw-bold mb-1">
+        <i class="bi bi-cpu me-2 text-success"></i>Dashboard de Machine Learning
+      </h2>
+      <p class="text-muted mb-0">Métricas, precisión y rendimiento de los modelos entrenados</p>
+    </div>
+    <form method="POST" action="{{ url_for('ml_reentrenar') }}"
+          onsubmit="return confirm('¿Reentrenar ambos modelos? Puede tardar unos segundos.')">
+      <button type="submit" class="btn btn-outline-success">
+        <i class="bi bi-arrow-repeat me-1"></i> Reentrenar modelos
+      </button>
+    </form>
+  </div>
+
+  <!-- ── MODELO 1: TRÁMITES ── -->
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-success text-white py-3">
+      <h5 class="mb-0"><i class="bi bi-diagram-3 me-2"></i>Modelo 1 — Clasificación de Trámites</h5>
+    </div>
+    <div class="card-body">
+      {% if st_tramites %}
+      <div class="row g-3 mb-4">
+        <div class="col-md-3">
+          <div class="bg-light rounded-3 p-3 text-center">
+            <div class="fs-1 fw-bold text-success">{{ (st_tramites.accuracy * 100)|round(1) }}%</div>
+            <div class="text-muted small">Accuracy</div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="bg-light rounded-3 p-3 text-center">
+            <div class="fs-1 fw-bold text-primary">{{ (st_tramites.f1_macro * 100)|round(1) }}%</div>
+            <div class="text-muted small">F1 Macro</div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="bg-light rounded-3 p-3 text-center">
+            <div class="fs-1 fw-bold text-warning">{{ st_tramites.n_train }}</div>
+            <div class="text-muted small">Muestras entrenamiento</div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="bg-light rounded-3 p-3 text-center">
+            <div class="fs-1 fw-bold text-secondary">{{ st_tramites.n_test }}</div>
+            <div class="text-muted small">Muestras prueba</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-4">
+        <!-- Importancia de features -->
+        <div class="col-md-6">
+          <h6 class="fw-semibold mb-3">Importancia de características</h6>
+          <canvas id="chartFeatTramites" height="200"></canvas>
+        </div>
+        <!-- Validación cruzada -->
+        <div class="col-md-6">
+          <h6 class="fw-semibold mb-3">Validación cruzada (5-fold F1)</h6>
+          <canvas id="chartCvTramites" height="200"></canvas>
+        </div>
+        <!-- Matriz de confusión -->
+        <div class="col-md-6">
+          <h6 class="fw-semibold mb-3">Matriz de confusión</h6>
+          <div class="table-responsive">
+            <table class="table table-bordered table-sm text-center small">
+              <thead class="table-success">
+                <tr>
+                  <th>Real \ Pred.</th>
+                  <th>Crítico</th><th>Normal</th><th>Bajo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for i, fila in enumerate(st_tramites.confusion_matrix) %}
+                <tr>
+                  <td class="fw-semibold">{{ ['Crítico','Normal','Bajo'][i] }}</td>
+                  {% for j, val in enumerate(fila) %}
+                  <td class="{{ 'table-success fw-bold' if i==j else '' }}">{{ val }}</td>
+                  {% endfor %}
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <!-- Mejores parámetros -->
+        <div class="col-md-6">
+          <h6 class="fw-semibold mb-3">Mejores hiperparámetros (GridSearchCV)</h6>
+          <ul class="list-group list-group-flush small">
+            {% for k, v in st_tramites.best_params.items() %}
+            <li class="list-group-item d-flex justify-content-between">
+              <span class="text-muted">{{ k }}</span>
+              <strong>{{ v }}</strong>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+      {% else %}
+      <div class="alert alert-warning">
+        No hay estadísticas aún. Usa el botón <strong>Reentrenar modelos</strong>.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── MODELO 2: CVs ── -->
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-primary text-white py-3">
+      <h5 class="mb-0"><i class="bi bi-person-check me-2"></i>Modelo 2 — Evaluación de Currículos</h5>
+    </div>
+    <div class="card-body">
+      {% if st_cvs %}
+      <div class="row g-3 mb-4">
+        <div class="col-md-3">
+          <div class="bg-light rounded-3 p-3 text-center">
+            <div class="fs-1 fw-bold text-success">{{ (st_cvs.accuracy * 100)|round(1) }}%</div>
+            <div class="text-muted small">Accuracy</div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="bg-light rounded-3 p-3 text-center">
+            <div class="fs-1 fw-bold text-primary">{{ (st_cvs.f1 * 100)|round(1) }}%</div>
+            <div class="text-muted small">F1 Score</div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="bg-light rounded-3 p-3 text-center">
+            <div class="fs-1 fw-bold text-danger">{{ (st_cvs.roc_auc * 100)|round(1) }}%</div>
+            <div class="text-muted small">ROC-AUC</div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="bg-light rounded-3 p-3 text-center">
+            <div class="fs-1 fw-bold text-warning">{{ st_cvs.n_train + st_cvs.n_test }}</div>
+            <div class="text-muted small">Total muestras</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-md-6">
+          <h6 class="fw-semibold mb-3">Importancia de características</h6>
+          <canvas id="chartFeatCvs" height="200"></canvas>
+        </div>
+        <div class="col-md-6">
+          <h6 class="fw-semibold mb-3">Validación cruzada (5-fold F1)</h6>
+          <canvas id="chartCvCvs" height="200"></canvas>
+        </div>
+        <div class="col-md-6">
+          <h6 class="fw-semibold mb-3">Matriz de confusión</h6>
+          <div class="table-responsive">
+            <table class="table table-bordered table-sm text-center small">
+              <thead class="table-primary">
+                <tr>
+                  <th>Real \ Pred.</th><th>No Apto</th><th>Apto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for i, fila in enumerate(st_cvs.confusion_matrix) %}
+                <tr>
+                  <td class="fw-semibold">{{ ['No Apto','Apto'][i] }}</td>
+                  {% for j, val in enumerate(fila) %}
+                  <td class="{{ 'table-primary fw-bold' if i==j else '' }}">{{ val }}</td>
+                  {% endfor %}
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <h6 class="fw-semibold mb-3">Mejores hiperparámetros</h6>
+          <ul class="list-group list-group-flush small">
+            {% for k, v in st_cvs.best_params.items() %}
+            <li class="list-group-item d-flex justify-content-between">
+              <span class="text-muted">{{ k }}</span>
+              <strong>{{ v }}</strong>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+      {% else %}
+      <div class="alert alert-warning">No hay estadísticas. Reentrenar modelos.</div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+{% if st_tramites %}
+// Features trámites
+new Chart(document.getElementById('chartFeatTramites'), {
+  type: 'bar',
+  data: {
+    labels: {{ st_tramites.feature_names | tojson }},
+    datasets: [{
+      label: 'Importancia',
+      data:  {{ st_tramites.feature_importances | tojson }},
+      backgroundColor: ['#1D9E75','#2E7D4F','#5DCAA5','#9FE1CB']
+    }]
+  },
+  options: { indexAxis:'y', plugins:{legend:{display:false}},
+             scales:{x:{max:1,beginAtZero:true}} }
+});
+// CV Scores trámites
+new Chart(document.getElementById('chartCvTramites'), {
+  type: 'bar',
+  data: {
+    labels: ['Fold 1','Fold 2','Fold 3','Fold 4','Fold 5'],
+    datasets: [{
+      label: 'F1 Macro',
+      data:  {{ st_tramites.cv_scores | tojson }},
+      backgroundColor: '#2E7D4F'
+    }]
+  },
+  options: { scales:{y:{min:0,max:1,beginAtZero:true}},
+             plugins:{legend:{display:false}} }
+});
+{% endif %}
+
+{% if st_cvs %}
+// Features CVs
+new Chart(document.getElementById('chartFeatCvs'), {
+  type: 'bar',
+  data: {
+    labels: {{ st_cvs.feature_names | tojson }},
+    datasets: [{
+      label: 'Importancia',
+      data:  {{ st_cvs.feature_importances | tojson }},
+      backgroundColor: ['#185FA5','#378ADD','#85B7EB','#B5D4F4']
+    }]
+  },
+  options: { indexAxis:'y', plugins:{legend:{display:false}},
+             scales:{x:{max:1,beginAtZero:true}} }
+});
+// CV Scores CVs
+new Chart(document.getElementById('chartCvCvs'), {
+  type: 'bar',
+  data: {
+    labels: ['Fold 1','Fold 2','Fold 3','Fold 4','Fold 5'],
+    datasets: [{
+      label: 'F1 Score',
+      data:  {{ st_cvs.cv_scores | tojson }},
+      backgroundColor: '#185FA5'
+    }]
+  },
+  options: { scales:{y:{min:0,max:1,beginAtZero:true}},
+             plugins:{legend:{display:false}} }
+});
+{% endif %}
+</script>
+{% endblock %}

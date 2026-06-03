@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Editar Usuario — GestiMuni{% endblock %}
+
+{% block contenido %}
+<div class="container py-4" style="max-width:640px;">
+  <div class="d-flex align-items-center mb-4 gap-3">
+    <a href="{{ url_for('usuarios') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+      <h4 class="fw-bold mb-0">Editar usuario</h4>
+      <p class="text-muted small mb-0">{{ usuario.nombre }}</p>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+      <form method="POST">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Nombre completo</label>
+            <input type="text" name="nombre" class="form-control"
+                   value="{{ usuario.nombre }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">DNI</label>
+            <input type="text" name="dni" class="form-control"
+                   value="{{ usuario.dni or '' }}" maxlength="8"
+                   placeholder="8 dígitos">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Correo electrónico</label>
+            <input type="email" name="email" class="form-control"
+                   value="{{ usuario.email or '' }}"
+                   placeholder="correo@dominio.com">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Teléfono</label>
+            <input type="text" name="telefono" class="form-control"
+                   value="{{ usuario.telefono or '' }}"
+                   placeholder="999 999 999">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Rol</label>
+            <select name="rol" class="form-select"
+              {{ 'disabled' if usuario.id == current_user.id }}>
+              <option value="ciudadano" {{ 'selected' if usuario.rol=='ciudadano' }}>Ciudadano</option>
+              <option value="empleado"  {{ 'selected' if usuario.rol=='empleado' }}>Empleado</option>
+              <option value="admin"     {{ 'selected' if usuario.rol=='admin' }}>Administrador</option>
+            </select>
+            {% if usuario.id == current_user.id %}
+            <input type="hidden" name="rol" value="{{ usuario.rol }}">
+            <small class="text-muted">No puedes cambiar tu propio rol.</small>
+            {% endif %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Nueva contraseña</label>
+            <input type="password" name="password" class="form-control"
+                   placeholder="Dejar en blanco para no cambiar">
+            <small class="text-muted">Solo ingresa si deseas cambiarla.</small>
+          </div>
+        </div>
+
+        <hr class="my-4">
+
+        <div class="d-flex justify-content-end gap-2">
+          <a href="{{ url_for('usuarios') }}" class="btn btn-outline-secondary">
+            Cancelar
+          </a>
+          <button type="submit" class="btn btn-success">
+            <i class="bi bi-check-lg me-1"></i> Guardar cambios
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Info de trámites del usuario -->
+  {% if usuario.tramites %}
+  <div class="card border-0 shadow-sm mt-4">
+    <div class="card-header bg-light py-2">
+      <h6 class="mb-0">Trámites de este usuario ({{ usuario.tramites|length }})</h6>
+    </div>
+    <div class="list-group list-group-flush">
+      {% for t in usuario.tramites[:5] %}
+      <div class="list-group-item d-flex justify-content-between align-items-center py-2">
+        <div>
+          <span class="small fw-semibold">{{ t.tipo.replace('_',' ').title() }}</span>
+          <div class="text-muted" style="font-size:11px;">{{ t.fecha_registro.strftime('%d/%m/%Y') }}</div>
+        </div>
+        <div class="d-flex gap-1">
+          <span class="badge bg-{{ 'danger' if t.prioridad_ml=='critico' else 'warning text-dark' if t.prioridad_ml=='normal' else 'success' }}">
+            {{ t.prioridad_ml }}
+          </span>
+          <span class="badge bg-secondary">{{ t.estado }}</span>
+        </div>
+      </div>
+      {% endfor %}
+      {% if usuario.tramites|length > 5 %}
+      <div class="list-group-item text-center text-muted small py-2">
+        ... y {{ usuario.tramites|length - 5 }} más
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

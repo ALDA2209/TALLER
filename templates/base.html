@@ -137,6 +137,14 @@
                     </a>
                 </li>
                 {% endif %}
+
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'auditoria' %}active{% endif %}"
+                        href="{{ url_for('auditoria') }}">
+                        <i class="bi bi-shield-check"></i> Auditoría
+                </a>
+            </li>
+
             </ul>
         </div>
         {% endif %}

@@ -1,51 +1,258 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
+{% block title %}Usuarios — GestiMuni{% endblock %}
 
 {% block contenido %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h4><i class="bi bi-people"></i> Gestión de Usuarios</h4>
-    <a href="{{ url_for('nuevo_usuario') }}" class="btn btn-institucional">
-        <i class="bi bi-person-plus"></i> Nuevo Usuario
+<div class="container-fluid py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2 class="fw-bold mb-1"><i class="bi bi-people me-2 text-success"></i>Gestión de Usuarios</h2>
+      <p class="text-muted mb-0">Administra todos los usuarios del sistema</p>
+    </div>
+    <a href="{{ url_for('nuevo_usuario') }}" class="btn btn-success">
+      <i class="bi bi-person-plus me-1"></i> Nuevo usuario
     </a>
+  </div>
+
+  <!-- Buscador por DNI -->
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label small fw-semibold text-muted mb-1">Buscar por DNI</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="text" id="campoDni" class="form-control"
+                   placeholder="Ingresa el DNI (8 dígitos)" maxlength="8">
+            <button class="btn btn-outline-success" onclick="buscarDni()">Buscar</button>
+          </div>
+        </div>
+        <div class="col-md-8">
+          <div id="resultadoDni" class="d-none"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros de búsqueda -->
+  <form method="GET" class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+      <div class="row g-2">
+        <div class="col-md-5">
+          <input type="text" name="q" value="{{ q }}" class="form-control"
+                 placeholder="Buscar por nombre, usuario o DNI...">
+        </div>
+        <div class="col-md-3">
+          <select name="rol" class="form-select">
+            <option value="">Todos los roles</option>
+            <option value="ciudadano"  {{ 'selected' if rol_filtro=='ciudadano' }}>Ciudadano</option>
+            <option value="empleado"   {{ 'selected' if rol_filtro=='empleado' }}>Empleado</option>
+            <option value="admin"      {{ 'selected' if rol_filtro=='admin' }}>Admin</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-outline-secondary w-100">
+            <i class="bi bi-funnel me-1"></i> Filtrar
+          </button>
+        </div>
+        <div class="col-md-2">
+          <a href="{{ url_for('usuarios') }}" class="btn btn-outline-danger w-100">
+            <i class="bi bi-x-circle me-1"></i> Limpiar
+          </a>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  <!-- Tabla de usuarios -->
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-success">
+            <tr>
+              <th class="ps-4">ID</th>
+              <th>Nombre</th>
+              <th>Usuario</th>
+              <th>DNI</th>
+              <th>Email</th>
+              <th>Teléfono</th>
+              <th>Rol</th>
+              <th>Estado</th>
+              <th>Registro</th>
+              <th class="text-center pe-4">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in usuarios %}
+            <tr class="{{ 'table-secondary' if not u.activo }}">
+              <td class="ps-4 text-muted small">{{ u.id }}</td>
+              <td>
+                <div class="fw-semibold">{{ u.nombre }}</div>
+                {% if u.ultimo_acceso %}
+                <div class="text-muted small">
+                  Último acceso: {{ u.ultimo_acceso.strftime('%d/%m/%Y %H:%M') }}
+                </div>
+                {% endif %}
+              </td>
+              <td><code>{{ u.username }}</code></td>
+              <td>{{ u.dni or '—' }}</td>
+              <td>{{ u.email or '—' }}</td>
+              <td>{{ u.telefono or '—' }}</td>
+              <td>
+                {% if u.rol == 'admin' %}
+                  <span class="badge bg-danger">Admin</span>
+                {% elif u.rol == 'empleado' %}
+                  <span class="badge bg-primary">Empleado</span>
+                {% else %}
+                  <span class="badge bg-secondary">Ciudadano</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if u.activo %}
+                  <span class="badge bg-success">Activo</span>
+                {% else %}
+                  <span class="badge bg-warning text-dark">Inactivo</span>
+                {% endif %}
+              </td>
+              <td class="small text-muted">{{ u.fecha_registro.strftime('%d/%m/%Y') }}</td>
+              <td class="text-center pe-4">
+                <div class="btn-group btn-group-sm">
+                  <!-- Editar -->
+                  <a href="{{ url_for('editar_usuario', id=u.id) }}"
+                     class="btn btn-outline-primary" title="Editar">
+                    <i class="bi bi-pencil"></i>
+                  </a>
+                  <!-- Activar/Desactivar -->
+                  {% if u.id != current_user.id %}
+                  <form method="POST" action="{{ url_for('toggle_usuario', id=u.id) }}"
+                        class="d-inline">
+                    <button type="submit"
+                            class="btn {{ 'btn-outline-warning' if u.activo else 'btn-outline-success' }}"
+                            title="{{ 'Desactivar' if u.activo else 'Activar' }}">
+                      <i class="bi {{ 'bi-person-x' if u.activo else 'bi-person-check' }}"></i>
+                    </button>
+                  </form>
+                  <!-- Eliminar -->
+                  <button type="button" class="btn btn-outline-danger"
+                          title="Eliminar"
+                          onclick="confirmarEliminar({{ u.id }}, '{{ u.nombre }}')">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="10" class="text-center py-5 text-muted">
+                <i class="bi bi-people fs-1 d-block mb-2"></i>
+                No se encontraron usuarios con los filtros aplicados.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="px-4 py-3 border-top d-flex justify-content-between align-items-center">
+        <small class="text-muted">Total: <strong>{{ usuarios|length }}</strong> usuario(s)</small>
+      </div>
+    </div>
+  </div>
+
 </div>
 
-<div class="card shadow-sm">
-    <div class="card-body p-0">
-        <table class="table table-hover mb-0">
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Nombre</th>
-                    <th>Usuario</th>
-                    <th>Rol</th>
-                    <th>Fecha Registro</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for u in usuarios %}
-                <tr>
-                    <td>{{ u.id }}</td>
-                    <td>{{ u.nombre }}</td>
-                    <td>{{ u.username }}</td>
-                    <td>
-                        {% if u.rol == 'admin' %}
-                        <span class="badge bg-danger">Admin</span>
-                        {% elif u.rol == 'empleado' %}
-                        <span class="badge bg-success">Empleado</span>
-                        {% else %}
-                        <span class="badge bg-primary">Ciudadano</span>
-                        {% endif %}
-                    </td>
-                    <td>{{ u.fecha_registro.strftime('%d/%m/%Y') }}</td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="5" class="text-center text-muted py-3">
-                        No hay usuarios registrados.
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<!-- Modal confirmar eliminación -->
+<div class="modal fade" id="modalEliminar" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header border-0">
+        <h5 class="modal-title text-danger">
+          <i class="bi bi-exclamation-triangle me-2"></i>Eliminar usuario
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>¿Estás seguro de que deseas eliminar a <strong id="nombreEliminar"></strong>?</p>
+        <p class="text-danger small">Esta acción no se puede deshacer. Los trámites asociados
+        serán reasignados al administrador.</p>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+          Cancelar
+        </button>
+        <form id="formEliminar" method="POST">
+          <button type="submit" class="btn btn-danger">
+            <i class="bi bi-trash me-1"></i> Sí, eliminar
+          </button>
+        </form>
+      </div>
     </div>
+  </div>
 </div>
+
+<script>
+function confirmarEliminar(id, nombre) {
+  document.getElementById('nombreEliminar').textContent = nombre;
+  document.getElementById('formEliminar').action = '/usuarios/eliminar/' + id;
+  new bootstrap.Modal(document.getElementById('modalEliminar')).show();
+}
+
+async function buscarDni() {
+  const dni = document.getElementById('campoDni').value.trim();
+  const div = document.getElementById('resultadoDni');
+  if (!dni || dni.length < 7) {
+    div.innerHTML = '<div class="alert alert-warning py-2 mb-0 small">Ingresa un DNI válido.</div>';
+    div.classList.remove('d-none');
+    return;
+  }
+  try {
+    const r = await fetch(`/usuarios/buscar-dni?dni=${dni}`);
+    const d = await r.json();
+    if (!r.ok) {
+      div.innerHTML = `<div class="alert alert-danger py-2 mb-0 small">
+        <i class="bi bi-x-circle me-1"></i>${d.error}</div>`;
+    } else {
+      const tramitesHtml = d.tramites.length
+        ? d.tramites.map(t =>
+            `<span class="badge bg-${t.prioridad==='critico'?'danger':t.prioridad==='normal'?'warning text-dark':'success'} me-1">
+              #${t.id} ${t.tipo.replace(/_/g,' ')} — ${t.estado}</span>`
+          ).join('')
+        : '<span class="text-muted small">Sin trámites</span>';
+      div.innerHTML = `
+        <div class="card border-success mb-0">
+          <div class="card-body py-2">
+            <div class="row align-items-center">
+              <div class="col-auto">
+                <div class="bg-success text-white rounded-circle d-flex align-items-center
+                            justify-content-center" style="width:40px;height:40px;font-weight:700">
+                  ${d.nombre.charAt(0).toUpperCase()}
+                </div>
+              </div>
+              <div class="col">
+                <div class="fw-semibold">${d.nombre}
+                  <span class="badge bg-secondary ms-1">${d.rol}</span></div>
+                <div class="small text-muted">DNI: ${d.dni} | ${d.email||'sin email'} | ${d.telefono||'sin tel.'}</div>
+                <div class="mt-1">${tramitesHtml}</div>
+              </div>
+              <div class="col-auto">
+                <a href="/usuarios/editar/${d.id}" class="btn btn-sm btn-outline-primary">
+                  <i class="bi bi-pencil"></i> Editar
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }
+    div.classList.remove('d-none');
+  } catch(e) {
+    div.innerHTML = '<div class="alert alert-danger py-2 mb-0 small">Error de conexión.</div>';
+    div.classList.remove('d-none');
+  }
+}
+
+document.getElementById('campoDni').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') buscarDni();
+});
+</script>
 {% endblock %}

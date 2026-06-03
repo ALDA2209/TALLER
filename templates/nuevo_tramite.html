@@ -1,45 +1,290 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
+{% block title %}Nuevo Trámite — GestiMuni{% endblock %}
 
 {% block contenido %}
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card shadow-sm">
-            <div class="card-header bg-institucional text-white">
-                <i class="bi bi-plus-circle"></i> Registrar Nuevo Trámite
-            </div>
-            <div class="card-body p-4">
-                <form method="POST">
-                    <div class="mb-3">
-                        <label class="form-label">Tipo de Trámite</label>
-                        <select name="tipo" class="form-select" required>
-                            <option value="">-- Selecciona --</option>
-                            <option value="licencia_construccion">Licencia de Construcción</option>
-                            <option value="certificado_residencia">Certificado de Residencia</option>
-                            <option value="permiso_negocio">Permiso de Negocio</option>
-                            <option value="denuncia_peligro">Denuncia de Peligro Público</option>
-                            <option value="partida_nacimiento">Partida de Nacimiento</option>
-                            <option value="licencia_funcionamiento">Licencia de Funcionamiento</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Descripción</label>
-                        <textarea name="descripcion" class="form-control" rows="4"
-                            placeholder="Describe tu trámite..." required></textarea>
-                    </div>
-                    <div class="alert alert-info" style="font-size:13px;">
-                        <i class="bi bi-cpu"></i> La prioridad será asignada automáticamente por nuestro sistema inteligente.
-                    </div>
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-institucional w-100">
-                            <i class="bi bi-cpu"></i> Registrar y Clasificar con ML
-                        </button>
-                        <a href="{{ url_for('tramites') }}" class="btn btn-outline-secondary w-100">
-                            Cancelar
-                        </a>
-                    </div>
-                </form>
-            </div>
-        </div>
+<div class="container py-4" style="max-width:760px;">
+
+  <div class="d-flex align-items-center mb-4 gap-3">
+    <a href="{{ url_for('tramites') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+
+    <div>
+      <h4 class="fw-bold mb-0">Registrar nuevo trámite</h4>
+      <p class="text-muted small mb-0">
+        El sistema analizará la solicitud con Machine Learning.
+      </p>
     </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+
+      <div class="alert alert-success d-flex align-items-center gap-2 mb-4">
+        <i class="bi bi-cpu-fill fs-5"></i>
+        <div>
+          <strong>Priorización inteligente:</strong>
+          el modelo ML evaluará tipo, urgencia, plazo y cantidad de documentos.
+        </div>
+      </div>
+
+      <form method="POST" enctype="multipart/form-data">
+
+        <input type="hidden" name="urgencia" id="urgenciaInput" value="media">
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">
+            Tipo de trámite <span class="text-danger">*</span>
+          </label>
+
+          <select name="tipo"
+                  id="tipoTramite"
+                  class="form-select form-select-lg"
+                  required
+                  onchange="actualizarUrgencia(this.value)">
+            <option value="" disabled selected>Seleccione un tipo de trámite...</option>
+
+            <optgroup label="Alta urgencia">
+              <option value="denuncia_peligro">⚠ Denuncia de peligro público</option>
+            </optgroup>
+
+            <optgroup label="Urgencia media">
+              <option value="licencia_construccion">🏗 Licencia de construcción</option>
+              <option value="licencia_funcionamiento">🏪 Licencia de funcionamiento</option>
+              <option value="permiso_negocio">💼 Permiso de negocio</option>
+            </optgroup>
+
+            <optgroup label="Urgencia baja">
+              <option value="certificado_residencia">🏠 Certificado de residencia</option>
+              <option value="partida_nacimiento">📄 Partida de nacimiento</option>
+            </optgroup>
+          </select>
+        </div>
+
+        <div id="indicadorUrgencia" class="mb-3 d-none">
+          <div class="p-3 rounded-3" id="urgenciaCard">
+            <div class="d-flex align-items-center gap-2">
+              <i id="urgenciaIcono" class="bi fs-4"></i>
+              <div>
+                <div class="fw-semibold small" id="urgenciaTitulo"></div>
+                <div class="small text-muted" id="urgenciaDesc"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">
+            Descripción detallada <span class="text-danger">*</span>
+          </label>
+
+          <textarea name="descripcion"
+                    class="form-control"
+                    rows="4"
+                    required
+                    placeholder="Describe tu solicitud. Incluye dirección, referencias, fechas o datos importantes."></textarea>
+
+          <div class="form-text">
+            Una descripción clara ayuda a reducir errores y tiempos de atención.
+          </div>
+        </div>
+
+        <div class="row mb-3">
+          <div class="col-md-6 mb-3 mb-md-0">
+            <label class="form-label fw-semibold">Días estimados de resolución</label>
+            <input type="number"
+                   name="dias_resolucion"
+                   class="form-control"
+                   min="1"
+                   value="5"
+                   required>
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Cantidad de documentos</label>
+            <input type="number"
+                   name="cantidad_documentos"
+                   class="form-control"
+                   min="1"
+                   value="1"
+                   required>
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label fw-semibold">Documentos adjuntos</label>
+
+          <div class="border border-2 border-dashed rounded-3 p-4 text-center"
+               id="zonaDropzone"
+               ondragover="event.preventDefault(); this.classList.add('border-success','bg-light')"
+               ondragleave="this.classList.remove('border-success','bg-light')"
+               ondrop="manejarDrop(event)">
+
+            <i class="bi bi-cloud-upload fs-1 text-muted d-block mb-2"></i>
+
+            <p class="mb-1 fw-semibold">Arrastra archivos aquí o</p>
+
+            <label for="documentos" class="btn btn-outline-success btn-sm">
+              <i class="bi bi-folder2-open me-1"></i>
+              Seleccionar archivos
+            </label>
+
+            <input type="file"
+                   id="documentos"
+                   name="documentos"
+                   multiple
+                   class="d-none"
+                   accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.txt"
+                   onchange="mostrarArchivos(this.files)">
+
+            <p class="text-muted small mt-2 mb-0">
+              PDF, Word, Excel, imágenes o TXT — máximo 16 MB.
+            </p>
+          </div>
+
+          <div id="listaArchivos" class="mt-2"></div>
+        </div>
+
+        <div class="d-grid gap-2">
+          <button type="submit" class="btn btn-success btn-lg">
+            <i class="bi bi-send me-2"></i>
+            Registrar y analizar trámite
+          </button>
+
+          <a href="{{ url_for('tramites') }}" class="btn btn-outline-secondary">
+            Cancelar
+          </a>
+        </div>
+
+      </form>
+    </div>
+  </div>
 </div>
+
+<script>
+const urgencias = {
+  denuncia_peligro: {
+    nivel: 'alta',
+    titulo: 'Urgencia detectada: ALTA',
+    color: 'danger',
+    icono: 'bi-exclamation-triangle-fill',
+    desc: 'Solicitud prioritaria por posible riesgo ciudadano.'
+  },
+  licencia_construccion: {
+    nivel: 'media',
+    titulo: 'Urgencia detectada: MEDIA',
+    color: 'warning',
+    icono: 'bi-hammer',
+    desc: 'Requiere revisión técnica municipal.'
+  },
+  licencia_funcionamiento: {
+    nivel: 'media',
+    titulo: 'Urgencia detectada: MEDIA',
+    color: 'warning',
+    icono: 'bi-shop',
+    desc: 'Será evaluado por el área correspondiente.'
+  },
+  permiso_negocio: {
+    nivel: 'media',
+    titulo: 'Urgencia detectada: MEDIA',
+    color: 'warning',
+    icono: 'bi-briefcase',
+    desc: 'Será procesado según flujo administrativo.'
+  },
+  certificado_residencia: {
+    nivel: 'baja',
+    titulo: 'Urgencia detectada: BAJA',
+    color: 'info',
+    icono: 'bi-house-door',
+    desc: 'Trámite regular de atención estándar.'
+  },
+  partida_nacimiento: {
+    nivel: 'baja',
+    titulo: 'Urgencia detectada: BAJA',
+    color: 'info',
+    icono: 'bi-file-earmark-text',
+    desc: 'Trámite documentario de baja criticidad.'
+  }
+};
+
+function actualizarUrgencia(tipo) {
+  const div = document.getElementById('indicadorUrgencia');
+  const card = document.getElementById('urgenciaCard');
+  const ico = document.getElementById('urgenciaIcono');
+  const tit = document.getElementById('urgenciaTitulo');
+  const des = document.getElementById('urgenciaDesc');
+  const input = document.getElementById('urgenciaInput');
+
+  if (!urgencias[tipo]) {
+    div.classList.add('d-none');
+    input.value = 'media';
+    return;
+  }
+
+  const u = urgencias[tipo];
+
+  input.value = u.nivel;
+  card.className = `p-3 rounded-3 bg-${u.color}-subtle border border-${u.color}`;
+  ico.className = `bi ${u.icono} fs-4 text-${u.color}`;
+  tit.textContent = u.titulo;
+  des.textContent = u.desc;
+
+  div.classList.remove('d-none');
+}
+
+function mostrarArchivos(files) {
+  const div = document.getElementById('listaArchivos');
+  div.innerHTML = '';
+
+  if (!files.length) return;
+
+  const ul = document.createElement('ul');
+  ul.className = 'list-group list-group-flush';
+
+  for (const f of files) {
+    const li = document.createElement('li');
+    li.className = 'list-group-item d-flex justify-content-between align-items-center py-2';
+
+    const ext = f.name.split('.').pop().toUpperCase();
+
+    const iconos = {
+      PDF: 'bi-file-earmark-pdf text-danger',
+      DOC: 'bi-file-earmark-word text-primary',
+      DOCX: 'bi-file-earmark-word text-primary',
+      XLS: 'bi-file-earmark-excel text-success',
+      XLSX: 'bi-file-earmark-excel text-success',
+      PNG: 'bi-file-earmark-image text-info',
+      JPG: 'bi-file-earmark-image text-info',
+      JPEG: 'bi-file-earmark-image text-info',
+      TXT: 'bi-file-earmark-text text-secondary'
+    };
+
+    li.innerHTML = `
+      <span>
+        <i class="bi ${iconos[ext] || 'bi-file-earmark'} me-2"></i>
+        ${f.name}
+      </span>
+      <span class="badge bg-secondary">
+        ${(f.size / 1024).toFixed(1)} KB
+      </span>
+    `;
+
+    ul.appendChild(li);
+  }
+
+  div.appendChild(ul);
+}
+
+function manejarDrop(e) {
+  e.preventDefault();
+
+  document.getElementById('zonaDropzone')
+    .classList.remove('border-success', 'bg-light');
+
+  const input = document.getElementById('documentos');
+  input.files = e.dataTransfer.files;
+
+  mostrarArchivos(e.dataTransfer.files);
+}
+</script>
 {% endblock %}
