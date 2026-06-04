@@ -202,6 +202,40 @@ def registro():
     return render_template('registro.html')
 
 
+# ── Registro de postulante a puestos de trabajo ─────────────────────
+@app.route('/registro/postulante', methods=['GET', 'POST'])
+def registro_postulante():
+    if request.method == 'POST':
+        dni = request.form.get('dni', '').strip()
+        nombre = request.form.get('nombre', '').strip()
+        username = request.form.get('username', '').strip()
+        email = request.form.get('email', '').strip() or None
+        telefono = request.form.get('telefono', '').strip() or None
+        password = request.form.get('password', '')
+
+        if not re.fullmatch(r'\d{8}', dni):
+            flash('El DNI debe contener exactamente 8 dígitos.', 'warning')
+            return redirect(url_for('registro_postulante'))
+        if Usuario.query.filter_by(username=username).first():
+            flash('El usuario ya existe.', 'danger')
+            return redirect(url_for('registro_postulante'))
+        if Usuario.query.filter_by(dni=dni).first():
+            flash('El DNI ya está registrado.', 'danger')
+            return redirect(url_for('registro_postulante'))
+
+        usuario = Usuario(
+            nombre=nombre, username=username,
+            password=generate_password_hash(password),
+            rol='postulante', dni=dni, email=email, telefono=telefono
+        )
+        db.session.add(usuario)
+        db.session.commit()
+        flash('Cuenta de postulante creada. Inicia sesión para subir tu CV.', 'success')
+        return redirect(url_for('login'))
+
+    return render_template('registro_postulante.html')
+
+
 # ── Login ciudadano ──────────────────────────────────────────────────
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -210,7 +244,7 @@ def login():
         password = request.form['password']
         user = Usuario.query.filter_by(username=username).first()
         if user and check_password_hash(user.password, password) and user.activo:
-            if user.rol in ('ciudadano', 'empleado'):
+            if user.rol in ('ciudadano', 'empleado', 'postulante'):
                 login_user(user)
                 user.ultimo_acceso = datetime.utcnow()
                 db.session.commit()
@@ -218,6 +252,9 @@ def login():
                     f'Inicio de sesión de {user.nombre}',
                     'Seguridad'
                 )
+                if user.rol == 'postulante':
+                    return redirect(url_for('postulante_panel'))
+                
                 return redirect(url_for('dashboard'))
             else:
                 flash('Usa el acceso de administrador.', 'danger')
@@ -315,6 +352,7 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    procesar_convocatorias_vencidas()
     if current_user.rol == 'admin':
         total   = Tramite.query.count()
         criticos= Tramite.query.filter_by(prioridad_ml='critico').count()
@@ -330,6 +368,9 @@ def dashboard():
         pend  = Tramite.query.filter_by(estado='pendiente').count()
         return render_template('dashboard_empleado.html',
             tramites=mis, pendientes=pend)
+
+    elif current_user.rol == 'postulante':
+        return redirect(url_for('postulante_panel'))
 
     else:  # ciudadano
         mis_tramites = Tramite.query.filter_by(ciudadano_id=current_user.id).all()
@@ -588,31 +629,116 @@ def eliminar_documento(doc_id):
 @login_required
 @rol_requerido('admin', 'empleado')
 def curriculos():
-    lista = Postulante.query.order_by(Postulante.puntaje_ml.desc()).all()
-    return render_template('curriculos.html', postulantes=lista)
+    procesar_convocatorias_vencidas()
+    lista = Postulante.query.order_by(Postulante.puesto.asc(), Postulante.puntaje_ml.desc()).all()
+    return render_template('curriculos.html', postulantes=lista, puestos=cargar_puestos())
+
+
+def convocatorias_abiertas():
+    ahora = datetime.now()
+    abiertas = []
+    for conv in cargar_convocatorias():
+        if conv.get('finalizada'):
+            continue
+        inicio = _parse_dt(conv.get('fecha_inicio'))
+        cierre = _parse_dt(conv.get('fecha_cierre'))
+        if (not inicio or ahora >= inicio) and (not cierre or ahora <= cierre):
+            abiertas.append(conv)
+    return abiertas
+
+
+@app.route('/postulante/cv', methods=['GET', 'POST'])
+@login_required
+@rol_requerido('postulante')
+def postulante_panel():
+    puestos = cargar_puestos()
+    abiertas = convocatorias_abiertas()
+    postulaciones = Postulante.query.filter_by(dni=current_user.dni).order_by(Postulante.fecha_registro.desc()).all()
+
+    if request.method == 'POST':
+        puesto_key = request.form.get('puesto', '').strip()
+        email_form = request.form.get('email', '').strip() or current_user.email
+        archivo_cv = request.files.get('archivo_cv')
+
+        puestos_abiertos = {c.get('puesto') for c in abiertas}
+        if puesto_key not in puestos or puesto_key not in puestos_abiertos:
+            flash('Seleccione un puesto con convocatoria abierta.', 'warning')
+            return redirect(url_for('postulante_panel'))
+        if not archivo_cv or not archivo_cv.filename:
+            flash('Debe subir su currículum vitae.', 'warning')
+            return redirect(url_for('postulante_panel'))
+
+        nombre_original = secure_filename(archivo_cv.filename)
+        extension = nombre_original.rsplit('.', 1)[-1].lower()
+        if extension not in ['pdf', 'docx', 'txt', 'csv']:
+            flash('Formato no permitido. Use PDF, DOCX, TXT o CSV.', 'danger')
+            return redirect(url_for('postulante_panel'))
+
+        nombre_archivo_cv = f"cv_{uuid.uuid4().hex}.{extension}"
+        ruta_cv = os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo_cv)
+        archivo_cv.save(ruta_cv)
+
+        texto_cv = extraer_texto_cv(ruta_cv, extension)
+        if not texto_cv:
+            flash('No se pudo leer el CV. Verifique que el archivo tenga texto legible.', 'danger')
+            return redirect(url_for('postulante_panel'))
+
+        analisis = analizar_cv_por_puesto(texto_cv, puesto_key)
+
+        postulante = Postulante(
+            nombre=current_user.nombre,
+            dni=current_user.dni,
+            email=email_form,
+            puesto=puesto_key,
+            experiencia=analisis['experiencia'],
+            educacion=analisis['educacion'],
+            habilidades=analisis['habilidades'],
+            idiomas=str(analisis['certificaciones']),
+            resultado_ml=analisis['resultado'],
+            puntaje_ml=analisis['puntaje'],
+            probabilidad=analisis['probabilidad'],
+            archivo_cv=nombre_archivo_cv,
+            texto_cv=analisis['explicacion']
+        )
+        db.session.add(postulante)
+        if email_form and email_form != current_user.email:
+            current_user.email = email_form
+        registrar_log('postulacion_cv', 'Postulante')
+        registrar_auditoria(
+            f"Postulante {current_user.nombre} subió CV para {puestos[puesto_key]['nombre']}",
+            'Postulaciones'
+        )
+        db.session.commit()
+
+        flash('Gracias por postular. Recibirás un correo cuando finalice la convocatoria.', 'success')
+        return redirect(url_for('postulante_panel'))
+
+    return render_template(
+        'postulante_panel.html',
+        puestos=puestos,
+        convocatorias=abiertas,
+        postulaciones=postulaciones
+    )
 
 @app.route('/curriculos/nuevo', methods=['GET', 'POST'])
 @login_required
 @rol_requerido('admin', 'empleado')
 def nuevo_curriculo():
+    puestos = cargar_puestos()
+
     if request.method == 'POST':
-
-        nombre = request.form.get('nombre', '').strip()
-        dni = request.form.get('dni', '').strip() or None
-        email = request.form.get('email', '').strip() or None
+        nombre_form = request.form.get('nombre', '').strip()
+        dni_form = request.form.get('dni', '').strip() or None
+        email_form = request.form.get('email', '').strip() or None
         puesto_key = request.form.get('puesto', '').strip()
-
         archivo_cv = request.files.get('archivo_cv')
 
-        nombre_archivo_cv = None
-        texto_cv = ""
-
-        if not nombre:
-            flash('Ingrese el nombre del postulante.', 'warning')
+        if dni_form and not re.fullmatch(r'\d{8}', dni_form):
+            flash('El DNI debe contener exactamente 8 dígitos.', 'warning')
             return redirect(url_for('nuevo_curriculo'))
 
-        if not puesto_key:
-            flash('Seleccione el puesto al que postula.', 'warning')
+        if not puesto_key or puesto_key not in puestos:
+            flash('Seleccione un puesto válido.', 'warning')
             return redirect(url_for('nuevo_curriculo'))
 
         if not archivo_cv or not archivo_cv.filename:
@@ -627,70 +753,54 @@ def nuevo_curriculo():
             return redirect(url_for('nuevo_curriculo'))
 
         nombre_archivo_cv = f"cv_{uuid.uuid4().hex}.{extension}"
-        ruta_cv = os.path.join(
-            app.config['UPLOAD_FOLDER'],
-            nombre_archivo_cv
-        )
-
+        ruta_cv = os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo_cv)
         archivo_cv.save(ruta_cv)
 
-        texto_cv = extraer_texto_cv(
-            ruta_cv,
-            extension
-        )
+        texto_cv = extraer_texto_cv(ruta_cv, extension)
 
         if not texto_cv:
             flash('No se pudo extraer texto del CV. Verifique que el archivo tenga contenido legible.', 'danger')
             return redirect(url_for('nuevo_curriculo'))
 
-        analisis = analizar_cv_por_puesto(
-            texto_cv,
-            puesto_key
-        )
+        analisis = analizar_cv_por_puesto(texto_cv, puesto_key)
+
+        nombre_final = nombre_form or analisis.get('nombre_detectado') or 'Postulante no identificado'
+        dni_final = dni_form or analisis.get('dni_detectado')
+        email_final = email_form or analisis.get('correo_detectado')
 
         postulante = Postulante(
-            nombre=nombre,
-            dni=dni,
-            email=email,
+            nombre=nombre_final,
+            dni=dni_final,
+            email=email_final,
             puesto=puesto_key,
-
-            experiencia=analisis["experiencia"],
-            educacion=analisis["educacion"],
-            habilidades=analisis["habilidades"],
-            idiomas=str(analisis["certificaciones"]),
-
-            resultado_ml=analisis["resultado"],
-            puntaje_ml=analisis["puntaje"],
-            probabilidad=analisis["probabilidad"],
-
+            experiencia=analisis['experiencia'],
+            educacion=analisis['educacion'],
+            habilidades=analisis['habilidades'],
+            idiomas=str(analisis['certificaciones']),
+            resultado_ml=analisis['resultado'],
+            puntaje_ml=analisis['puntaje'],
+            probabilidad=analisis['probabilidad'],
             archivo_cv=nombre_archivo_cv,
-            texto_cv=analisis["explicacion"]
+            texto_cv=analisis['explicacion']
         )
 
         db.session.add(postulante)
-
-        registrar_log(
-            'nuevo_curriculo',
-            'Postulante'
-        )
-
+        registrar_log('nuevo_curriculo', 'Postulante')
         registrar_auditoria(
-            f"Evaluó CV de {nombre} para el puesto {puesto_key}: "
+            f"Evaluó CV de {nombre_final} para el puesto {puestos[puesto_key]['nombre']}: "
             f"{analisis['resultado'].upper()} con puntaje {analisis['puntaje']}%",
-            "Currículos"
+            'Currículos'
         )
-
         db.session.commit()
 
         flash(
-            f"CV evaluado: {analisis['resultado'].upper()} — "
-            f"Puntaje: {analisis['puntaje']}%",
+            f"CV evaluado: {analisis['resultado'].upper()} — Puntaje: {analisis['puntaje']}% — "
+            f"Recomendación: {analisis['recomendacion']}",
             'success'
         )
-
         return redirect(url_for('curriculos'))
 
-    return render_template('nuevo_curriculo.html')
+    return render_template('nuevo_curriculo.html', puestos=puestos)
 
 
 @app.route('/curriculos/eliminar/<int:id>', methods=['POST'])
@@ -1136,6 +1246,10 @@ def inicializar_bd():
                         password=generate_password_hash('1234'),
                         rol='ciudadano', email='ciudadano@gmail.com',
                         dni='87654321'),
+                Usuario(nombre='Postulante Demo', username='postulante1',
+                        password=generate_password_hash('post123'),
+                        rol='postulante', email='postulante@gmail.com',
+                        dni='11223344'),
             ]
             db.session.add_all(usuarios_default)
             db.session.commit()
@@ -1143,152 +1257,75 @@ def inicializar_bd():
 
 
 # ════════════════════════════════════════════════════════════════════
-# IA AVANZADA PARA EVALUACIÓN DE CURRÍCULOS
+# IA AVANZADA PARA EVALUACIÓN DE CURRÍCULOS + CONVOCATORIAS
 # ════════════════════════════════════════════════════════════════════
 def _normalizar_texto(texto):
-    """Convierte texto a minúsculas y elimina tildes para mejorar coincidencias."""
+    '''Minúsculas, sin tildes y espacios normalizados.'''
     if not texto:
         return ""
-    texto = unicodedata.normalize("NFKD", texto)
+    texto = unicodedata.normalize("NFKD", str(texto))
     texto = "".join(c for c in texto if not unicodedata.combining(c))
-    return texto.lower()
+    texto = re.sub(r"\s+", " ", texto)
+    return texto.lower().strip()
 
 
-def _ruta_puestos_json():
-    return os.path.join(os.path.dirname(__file__), "data", "puestos.json")
+def _ruta_data(nombre):
+    carpeta = os.path.join(os.path.dirname(__file__), 'data')
+    os.makedirs(carpeta, exist_ok=True)
+    return os.path.join(carpeta, nombre)
 
 
 def cargar_puestos():
-    """Carga perfiles de puestos. Si no existe data/puestos.json, usa perfiles internos."""
-    puestos_default = {
-        "abogado": {
-            "nombre": "Abogado Municipal",
-            "educacion_clave": ["derecho", "abogado", "juridico", "legal", "leyes"],
-            "habilidades_clave": ["contratos", "normativa", "expedientes", "derecho administrativo", "litigios", "asesoria legal"],
-            "certificaciones_clave": ["colegiatura", "cal", "derecho administrativo", "contrataciones del estado"],
-            "min_experiencia": 1
-        },
-        "contador": {
-            "nombre": "Contador Municipal",
-            "educacion_clave": ["contabilidad", "contador", "finanzas", "tributacion"],
-            "habilidades_clave": ["siga", "siaf", "presupuesto", "balance", "tesoreria", "costos", "excel"],
-            "certificaciones_clave": ["contabilidad gubernamental", "siaf", "siga", "tributacion"],
-            "min_experiencia": 1
-        },
-        "administrador": {
-            "nombre": "Administrador Público",
-            "educacion_clave": ["administracion", "gestion publica", "management"],
-            "habilidades_clave": ["gestion", "planeamiento", "organizacion", "recursos humanos", "logistica", "excel"],
-            "certificaciones_clave": ["gestion publica", "servir", "contrataciones", "planeamiento"],
-            "min_experiencia": 1
-        },
-        "secretaria": {
-            "nombre": "Secretaria Administrativa",
-            "educacion_clave": ["secretariado", "administracion", "tecnico"],
-            "habilidades_clave": ["word", "excel", "archivo", "redaccion", "atencion al cliente", "ofimatica"],
-            "certificaciones_clave": ["ofimatica", "excel", "secretariado"],
-            "min_experiencia": 1
-        },
-        "asistente_administrativo": {
-            "nombre": "Asistente Administrativo",
-            "educacion_clave": ["administracion", "secretariado", "asistente administrativo"],
-            "habilidades_clave": ["archivo", "tramite documentario", "atencion al usuario", "word", "excel", "redaccion"],
-            "certificaciones_clave": ["ofimatica", "gestion documental", "excel"],
-            "min_experiencia": 1
-        },
-        "ingeniero_civil": {
-            "nombre": "Ingeniero Civil",
-            "educacion_clave": ["ingenieria civil", "civil", "obras", "construccion"],
-            "habilidades_clave": ["autocad", "civil 3d", "s10", "presupuestos", "metrados", "valorizaciones", "expediente tecnico", "ms project"],
-            "certificaciones_clave": ["residente de obra", "supervisor de obra", "seguridad en obra"],
-            "min_experiencia": 2
-        },
-        "arquitecto": {
-            "nombre": "Arquitecto Municipal",
-            "educacion_clave": ["arquitectura", "arquitecto", "urbanismo", "diseno arquitectonico"],
-            "habilidades_clave": ["autocad", "sketchup", "revit", "planos", "licencias", "catastro", "urbanismo"],
-            "certificaciones_clave": ["revit", "autocad", "habilitacion urbana"],
-            "min_experiencia": 1
-        },
-        "tecnico_informatica": {
-            "nombre": "Técnico en Informática",
-            "educacion_clave": ["computacion", "informatica", "sistemas", "software"],
-            "habilidades_clave": ["soporte tecnico", "redes", "windows", "linux", "base de datos", "sql", "python", "java", "php"],
-            "certificaciones_clave": ["redes", "cisco", "soporte tecnico", "base de datos"],
-            "min_experiencia": 1
-        },
-        "programador": {
-            "nombre": "Programador / Desarrollador",
-            "educacion_clave": ["software", "sistemas", "computacion", "informatica", "programacion"],
-            "habilidades_clave": ["python", "java", "php", "javascript", "sql", "mysql", "flask", "laravel", "react"],
-            "certificaciones_clave": ["backend", "frontend", "base de datos", "desarrollo web"],
-            "min_experiencia": 1
-        },
-        "project_manager": {
-            "nombre": "Project Manager",
-            "educacion_clave": ["management", "administracion", "maestria", "master", "product owner"],
-            "habilidades_clave": ["project manager", "product manager", "product owner", "customer success", "pmp", "capm", "trello", "notion", "analytics", "zendesk", "mixpanel", "google analytics", "tableau", "intercom"],
-            "certificaciones_clave": ["pmp", "capm", "google ads", "certificado", "diplomado"],
-            "min_experiencia": 2
-        },
-        "recursos_humanos": {
-            "nombre": "Recursos Humanos",
-            "educacion_clave": ["recursos humanos", "psicologia", "administracion"],
-            "habilidades_clave": ["seleccion", "entrevista", "planillas", "capacitacion", "clima laboral"],
-            "certificaciones_clave": ["gestion del talento", "planillas", "legislacion laboral"],
-            "min_experiencia": 1
-        },
-        "atencion_ciudadano": {
-            "nombre": "Atención al Ciudadano",
-            "educacion_clave": ["administracion", "comunicacion", "secretariado"],
-            "habilidades_clave": ["atencion al cliente", "atencion al ciudadano", "comunicacion", "reclamos", "orientacion", "mesa de partes"],
-            "certificaciones_clave": ["atencion al cliente", "calidad de servicio"],
-            "min_experiencia": 0
-        },
-        "seguridad_ciudadana": {
-            "nombre": "Seguridad Ciudadana",
-            "educacion_clave": ["seguridad", "serenazgo", "policia", "prevencion"],
-            "habilidades_clave": ["serenazgo", "patrullaje", "primeros auxilios", "prevencion", "control"],
-            "certificaciones_clave": ["primeros auxilios", "seguridad ciudadana", "defensa civil"],
-            "min_experiencia": 0
-        },
-        "logistica": {
-            "nombre": "Logística Municipal",
-            "educacion_clave": ["logistica", "administracion", "abastecimiento"],
-            "habilidades_clave": ["compras", "almacen", "contrataciones", "seace", "siga", "inventario"],
-            "certificaciones_clave": ["contrataciones del estado", "seace", "siga"],
-            "min_experiencia": 1
-        }
-    }
-
-    ruta = _ruta_puestos_json()
-    try:
-        if os.path.exists(ruta):
-            with open(ruta, "r", encoding="utf-8") as f:
+    ruta = _ruta_data('puestos.json')
+    if os.path.exists(ruta):
+        try:
+            with open(ruta, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 if isinstance(data, dict) and data:
                     return data
-    except Exception as e:
-        print("No se pudo cargar data/puestos.json. Usando puestos internos:", e)
+        except Exception as e:
+            print('No se pudo cargar puestos.json:', e)
 
-    return puestos_default
+    # Respaldo interno por si el JSON no existe
+    return {
+        'abogado': {'nombre':'Abogado Municipal','educacion_clave':['derecho','abogado','juridico','legal','leyes'],'habilidades_clave':['contratos','normativa','expedientes','derecho administrativo','litigios','asesoria legal'],'certificaciones_clave':['colegiatura','cal','derecho administrativo','contrataciones del estado'],'min_experiencia':1},
+        'project_manager': {'nombre':'Project Manager','educacion_clave':['management','administracion','maestria','master','product owner'],'habilidades_clave':['project manager','product manager','product owner','customer success','pmp','capm','trello','notion','analytics','zendesk','mixpanel','google analytics','tableau','intercom'],'certificaciones_clave':['pmp','capm','google ads'],'min_experiencia':2},
+        'contador': {'nombre':'Contador Municipal','educacion_clave':['contabilidad','contador','finanzas','tributacion'],'habilidades_clave':['siga','siaf','presupuesto','balance','tesoreria','costos','excel'],'certificaciones_clave':['contabilidad gubernamental','siaf','siga'],'min_experiencia':1},
+        'secretaria': {'nombre':'Secretaria Administrativa','educacion_clave':['secretariado','administracion','tecnico'],'habilidades_clave':['word','excel','archivo','redaccion','atencion al cliente','ofimatica'],'certificaciones_clave':['ofimatica','excel'],'min_experiencia':1}
+    }
+
+
+def _leer_json(nombre, defecto):
+    ruta = _ruta_data(nombre)
+    if not os.path.exists(ruta):
+        return defecto
+    try:
+        with open(ruta, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return defecto
+
+
+def _guardar_json(nombre, data):
+    ruta = _ruta_data(nombre)
+    with open(ruta, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 def extraer_texto_cv(ruta, extension):
-    """Extrae texto real del CV. Usa docx2txt para DOCX y fallback con XML interno."""
+    '''Extrae texto real del CV. DOCX usa docx2txt + tablas + XML como respaldo.'''
     texto = ""
-
     try:
-        if extension == "pdf":
+        if extension == 'pdf':
             reader = PdfReader(ruta)
             for page in reader.pages:
                 texto += page.extract_text() or ""
 
-        elif extension == "docx":
+        elif extension == 'docx':
             try:
                 texto = docx2txt.process(ruta) or ""
             except Exception as e:
-                print("docx2txt falló, usando fallback python-docx:", e)
+                print('docx2txt falló:', e)
 
             if not texto.strip():
                 try:
@@ -1302,210 +1339,461 @@ def extraer_texto_cv(ruta, extension):
                                     partes.append(cell.text.strip())
                     texto = "\n".join(partes)
                 except Exception as e:
-                    print("python-docx falló:", e)
+                    print('python-docx falló:', e)
 
             if not texto.strip():
                 try:
                     with zipfile.ZipFile(ruta) as z:
-                        xml = z.read("word/document.xml").decode("utf-8", errors="ignore")
-                        texto = re.sub(r"<[^>]+>", " ", xml)
+                        xml = z.read('word/document.xml').decode('utf-8', errors='ignore')
+                        texto = re.sub(r'<[^>]+>', ' ', xml)
                 except Exception as e:
-                    print("fallback XML DOCX falló:", e)
+                    print('fallback XML DOCX falló:', e)
 
-        elif extension in ["txt", "csv"]:
-            with open(ruta, "r", encoding="utf-8", errors="ignore") as f:
+        elif extension in ['txt', 'csv']:
+            with open(ruta, 'r', encoding='utf-8', errors='ignore') as f:
                 texto = f.read()
 
     except Exception as e:
-        print("ERROR EXTRAYENDO CV:", e)
+        print('ERROR EXTRAYENDO CV:', e)
 
-    texto = re.sub(r"\s+", " ", texto).strip()
-    print("========== TEXTO CV EXTRAÍDO ==========")
-    print(texto[:2000])
-    print("========== FIN TEXTO CV ==========")
+    texto = re.sub(r'\s+', ' ', texto).strip()
+    print('========== TEXTO CV EXTRAÍDO ==========', texto[:1200], '========== FIN TEXTO CV ==========', sep='\n')
     return texto
+
+
+def _detectar_nombre(texto_original):
+    secciones = {'FORMACION REGLADA','EXPERIENCIA PROFESIONAL','IDIOMAS','CERTIFICADOS','HARD SKILLS','QUIERES SABER MAS SOBRE MI'}
+    candidatos = re.findall(r'\b([A-ZÁÉÍÓÚÑ]{3,}(?:\s+[A-ZÁÉÍÓÚÑ]{3,}){1,3})\b', texto_original)
+    for c in candidatos:
+        limpio = _normalizar_texto(c).upper()
+        if limpio not in secciones and not any(s in limpio for s in ['FORMACION','EXPERIENCIA','CERTIFICADO','IDIOMA','HARD']):
+            partes = c.title().split()
+            # Evita duplicar nombre si el extractor lo repitió
+            filtradas = []
+            for p in partes:
+                if not filtradas or filtradas[-1].lower() != p.lower():
+                    filtradas.append(p)
+            return ' '.join(filtradas[:3])
+    return None
+
+
+def _detectar_dni(texto_original):
+    m = re.search(r'\b(?:dni|documento|identidad)\D{0,10}(\d{8})\b', texto_original, re.I)
+    if m:
+        return m.group(1)
+    return None
+
+
+def _detectar_fecha_nacimiento_y_edad(texto_original):
+    patrones = [
+        r'(?:fecha de nacimiento|nacimiento|fec\. nac\.?|f\. nac\.?)\D{0,20}(\d{1,2}[/-]\d{1,2}[/-]\d{4})',
+        r'(?:fecha de nacimiento|nacimiento)\D{0,20}(\d{4}[/-]\d{1,2}[/-]\d{1,2})'
+    ]
+    for pat in patrones:
+        m = re.search(pat, texto_original, re.I)
+        if m:
+            fecha = m.group(1)
+            for fmt in ['%d/%m/%Y','%d-%m-%Y','%Y/%m/%d','%Y-%m-%d']:
+                try:
+                    dt = datetime.strptime(fecha, fmt)
+                    hoy = datetime.now()
+                    edad = hoy.year - dt.year - ((hoy.month, hoy.day) < (dt.month, dt.day))
+                    return fecha, edad
+                except Exception:
+                    pass
+    return None, None
+
+
+def _experiencia_por_rangos(texto_lower):
+    '''Calcula experiencia evitando duplicar rangos superpuestos.'''
+    intervalos = []
+    # Rangos tipo 02/2016 - Presente
+    for mes_i, anio_i, fin in re.findall(r'(\d{1,2})/(\d{4})\s*-\s*(presente|actualidad|\d{1,2}/\d{4})', texto_lower):
+        inicio = int(anio_i) * 12 + int(mes_i)
+        if fin in ['presente', 'actualidad']:
+            now = datetime.now()
+            final = now.year * 12 + now.month
+        else:
+            mes_f, anio_f = fin.split('/')
+            final = int(anio_f) * 12 + int(mes_f)
+        if final > inicio:
+            intervalos.append((inicio, final))
+
+    if not intervalos:
+        return 0
+
+    intervalos = sorted(set(intervalos))
+    fusionados = []
+    for ini, fin in intervalos:
+        if not fusionados or ini > fusionados[-1][1]:
+            fusionados.append([ini, fin])
+        else:
+            fusionados[-1][1] = max(fusionados[-1][1], fin)
+    meses = sum(fin - ini for ini, fin in fusionados)
+    return round(meses / 12)
 
 
 def analizar_cv_por_puesto(texto, puesto_key):
     puestos = cargar_puestos()
-    perfil = puestos.get(puesto_key) or puestos.get("project_manager") or next(iter(puestos.values()))
+    perfil = puestos.get(puesto_key) or next(iter(puestos.values()))
 
-    texto_original = texto or ""
+    texto_original = texto or ''
     texto_lower = _normalizar_texto(texto_original)
 
-    # Datos personales
-    correo = "No detectado"
-    telefono = "No detectado"
-    correo_match = re.search(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", texto_original)
-    if correo_match:
-        correo = correo_match.group(0)
+    correo_match = re.search(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', texto_original)
+    correo = correo_match.group(0) if correo_match else None
 
-    telefono_match = re.search(r"(\+?\d[\d\s]{7,}\d)", texto_original)
-    if telefono_match:
-        telefono = telefono_match.group(0).strip()
+    telefono_match = re.search(r'(\+?\d[\d\s]{7,}\d)', texto_original)
+    telefono = telefono_match.group(0).strip() if telefono_match else None
 
-    # Nombre detectado opcional
-    nombre_detectado = "No detectado"
-    nombre_match = re.search(r"\b([A-ZÁÉÍÓÚÑ]{3,}\s+[A-ZÁÉÍÓÚÑ]{3,}(?:\s+[A-ZÁÉÍÓÚÑ]{3,})?)\b", texto_original)
-    if nombre_match:
-        nombre_detectado = nombre_match.group(1).title()
+    nombre_detectado = _detectar_nombre(texto_original)
+    dni_detectado = _detectar_dni(texto_original)
+    fecha_nacimiento, edad = _detectar_fecha_nacimiento_y_edad(texto_original)
 
-    # Experiencia
-    experiencia = 0
-    coincidencias = re.findall(r"(\d+)\s*(años|anos|año|ano)", texto_lower)
-    if coincidencias:
-        experiencia = max(int(c[0]) for c in coincidencias)
-
-    # Detectar rangos tipo 02/2016 - Presente o 01/2014 - 02/2016
-    rangos = re.findall(r"(\d{1,2})/(\d{4})\s*-\s*(presente|actualidad|\d{1,2}/\d{4})", texto_lower)
-    total_anios = 0
-    for _mes_inicio, anio_inicio, fin in rangos:
-        anio_inicio = int(anio_inicio)
-        if fin in ["presente", "actualidad"]:
-            anio_fin = datetime.now().year
-        else:
-            anio_fin = int(fin.split("/")[-1])
-        total_anios += max(0, anio_fin - anio_inicio)
-    experiencia = max(experiencia, total_anios)
-
-    # Si el propio CV declara experiencia resumida
-    if "15 anos" in texto_lower or "15 años" in texto_lower:
-        experiencia = max(experiencia, 15)
+    # Experiencia: si el CV declara "15 años", se prioriza; si no, se calcula por rangos fusionados.
+    declarados = [int(x[0]) for x in re.findall(r'(\d{1,2})\s*(anos|años|ano|año)\s+de\s+experiencia', texto_lower)]
+    if not declarados:
+        declarados = [int(x[0]) for x in re.findall(r'en\s+(\d{1,2})\s*(anos|años)', texto_lower)]
+    exp_declarada = max(declarados) if declarados else 0
+    exp_rangos = _experiencia_por_rangos(texto_lower)
+    experiencia = exp_declarada or exp_rangos
+    experiencia = max(0, min(experiencia, 40))  # límite razonable
 
     # Educación
-    educacion = "secundaria"
+    educacion = 'secundaria'
     educacion_detectada = []
     formaciones = {
-        "Master in Management": ["master in management"],
-        "Maestría en Administración": ["maestria en administracion", "maestría en administración"],
-        "Universidad": ["universidad"],
-        "Bachiller": ["bachiller"],
-        "Técnico": ["tecnico", "técnico"]
+        'Doctorado': ['doctorado', 'phd'],
+        'Maestría / Master': ['maestria', 'master', 'mba'],
+        'Universidad': ['universidad', 'bachiller', 'licenciado', 'titulo profesional'],
+        'Técnico': ['tecnico', 'instituto']
     }
     for etiqueta, claves in formaciones.items():
-        if any(_normalizar_texto(c) in texto_lower for c in claves):
+        if any(c in texto_lower for c in claves):
             educacion_detectada.append(etiqueta)
-
-    if any(x in texto_lower for x in ["maestria", "master", "postgrado"]):
-        educacion = "postgrado"
-    elif any(x in texto_lower for x in ["universidad", "universitario", "bachiller"]):
-        educacion = "universitario"
-    elif any(x in texto_lower for x in ["tecnico"]):
-        educacion = "tecnico"
+    if any(x in texto_lower for x in ['doctorado', 'phd']):
+        educacion = 'doctorado'
+    elif any(x in texto_lower for x in ['maestria', 'master', 'mba', 'postgrado']):
+        educacion = 'postgrado'
+    elif any(x in texto_lower for x in ['universidad', 'universitario', 'bachiller', 'licenciado']):
+        educacion = 'universitario'
+    elif 'tecnico' in texto_lower:
+        educacion = 'tecnico'
 
     # Idiomas
+    mapa_idiomas = {'ingles':'Inglés','espanol':'Español','portugues':'Portugués','frances':'Francés','quechua':'Quechua'}
     idiomas_detectados = []
-    for idioma in ["inglés", "ingles", "español", "espanol", "portugués", "portugues", "francés", "frances"]:
-        if _normalizar_texto(idioma) in texto_lower:
-            etiqueta = idioma.replace("ingles", "inglés").replace("espanol", "español").title()
-            if etiqueta not in idiomas_detectados:
-                idiomas_detectados.append(etiqueta)
+    for clave, etiqueta in mapa_idiomas.items():
+        if clave in texto_lower and etiqueta not in idiomas_detectados:
+            idiomas_detectados.append(etiqueta)
 
-    # Certificaciones
-    posibles_certificaciones = [
-        "PMP", "PMPs", "CAPM", "CAPMs", "Google Ads", "Campañas de búsqueda",
-        "Campañas de Shopping", "Diplomado", "Certificado", "Certificación"
-    ]
+    # Certificaciones sin duplicados
+    mapa_cert = {
+        'pmp': 'PMP', 'pmps': 'PMP', 'capm': 'CAPM', 'capms': 'CAPM',
+        'google ads': 'Google Ads', 'campanas de busqueda': 'Google Ads', 'campanas de shopping': 'Google Ads',
+        'siga': 'SIGA', 'siaf': 'SIAF', 'seace': 'SEACE', 'scrum': 'Scrum', 'power bi': 'Power BI'
+    }
     certificaciones_detectadas = []
-    for cert in posibles_certificaciones:
-        if _normalizar_texto(cert) in texto_lower:
-            certificaciones_detectadas.append(cert)
+    for clave, etiqueta in mapa_cert.items():
+        if clave in texto_lower and etiqueta not in certificaciones_detectadas:
+            certificaciones_detectadas.append(etiqueta)
 
-    # Hard skills generales
-    skills_generales = [
-        "Tableau", "Mixpanel", "Google Analytics 360", "Google Analytics", "Notion", "Trello",
-        "Zendesk", "Intercom", "Excel", "Word", "SQL", "Python", "Java", "Power BI",
-        "AutoCAD", "SIAF", "SIGA", "SEACE", "PHP", "JavaScript", "MySQL"
-    ]
+    # Skills
+    skills_generales = ['Tableau','Mixpanel','Google Analytics 360','Google Analytics','Notion','Trello','Zendesk','Intercom','Excel','Word','SQL','Python','Java','Power BI','AutoCAD','SIAF','SIGA','SEACE','PHP','JavaScript','MySQL','Flask','Laravel','React','Redacción','Archivo','Atención al cliente']
     hard_skills_detectadas = []
     for skill in skills_generales:
-        if _normalizar_texto(skill) in texto_lower:
+        if _normalizar_texto(skill) in texto_lower and skill not in hard_skills_detectadas:
             hard_skills_detectadas.append(skill)
 
-    # Experiencia relevante/cargos
-    cargos_clave = [
-        "Ecommerce Product Owner", "Product Owner", "Product Manager", "Project Manager",
-        "Customer Success Manager", "Customer Success", "Agente de Servicio al cliente",
-        "Administrador", "Abogado", "Contador", "Ingeniero Civil", "Arquitecto", "Programador"
-    ]
+    cargos_clave = ['Ecommerce Product Owner','Product Owner','Product Manager','Project Manager','Customer Success Manager','Customer Success','Agente de Servicio al cliente','Administrador','Abogado','Contador','Ingeniero Civil','Arquitecto','Programador','Secretaria','Asistente Administrativo']
     experiencia_relevante = []
     for cargo in cargos_clave:
-        if _normalizar_texto(cargo) in texto_lower:
+        if _normalizar_texto(cargo) in texto_lower and cargo not in experiencia_relevante:
             experiencia_relevante.append(cargo)
 
-    # Coincidencias contra perfil del puesto
-    edu_match = sum(1 for p in perfil.get("educacion_clave", []) if _normalizar_texto(p) in texto_lower)
-    hab_match = sum(1 for p in perfil.get("habilidades_clave", []) if _normalizar_texto(p) in texto_lower)
-    cert_match = sum(1 for p in perfil.get("certificaciones_clave", []) if _normalizar_texto(p) in texto_lower)
+    edu_match = sum(1 for p in perfil.get('educacion_clave', []) if _normalizar_texto(p) in texto_lower)
+    hab_match = sum(1 for p in perfil.get('habilidades_clave', []) if _normalizar_texto(p) in texto_lower)
+    cert_match = sum(1 for p in perfil.get('certificaciones_clave', []) if _normalizar_texto(p) in texto_lower)
+
+    # Puntaje explicable 100
+    score_exp = 25 if experiencia >= int(perfil.get('min_experiencia', 0)) else min(20, experiencia * 5)
+    score_edu = min(20, edu_match * 10 + (10 if educacion in ['postgrado', 'doctorado'] else 0))
+    score_hab = min(25, hab_match * 5 + min(len(hard_skills_detectadas), 10))
+    score_cert = min(15, cert_match * 5 + len(certificaciones_detectadas) * 3)
+    score_cargos = 10 if experiencia_relevante else 0
+    score_idiomas = 5 if len(idiomas_detectados) >= 2 else (3 if idiomas_detectados else 0)
+
+    puntaje = score_exp + score_edu + score_hab + score_cert + score_cargos + score_idiomas
+
+    # Penalización fuerte si es un puesto legal y no hay evidencia jurídica.
+    if puesto_key == 'abogado' and not any(x in texto_lower for x in ['derecho', 'abogado', 'juridico', 'legal', 'leyes', 'contratos']):
+        puntaje = min(puntaje, 35)
+
+    puntaje = int(min(max(puntaje, 0), 100))
+    resultado = 'apto' if puntaje >= 70 else ('revisar' if puntaje >= 50 else 'no_apto')
+    recomendacion = 'RECOMENDADO PARA ENTREVISTA' if puntaje >= 70 else ('REVISAR MANUALMENTE' if puntaje >= 50 else 'NO RECOMENDADO')
 
     habilidades = max(hab_match, len(hard_skills_detectadas))
     certificaciones = max(cert_match, len(certificaciones_detectadas))
 
-    # Score base explicable
-    puntaje = 0
-    if experiencia >= int(perfil.get("min_experiencia", 0)):
-        puntaje += 25
-    puntaje += min(edu_match * 15, 25)
-    puntaje += min(hab_match * 7, 35)
-    puntaje += min(cert_match * 5, 15)
-    if len(idiomas_detectados) >= 2:
-        puntaje += 10
-
-    # Reglas fuertes por puesto
-    if puesto_key == "project_manager":
-        if any(x in texto_lower for x in ["project manager", "product manager", "product owner", "customer success"]):
-            puntaje += 25
-        if any(x in texto_lower for x in ["pmp", "capm"]):
-            puntaje += 15
-        if any(x in texto_lower for x in ["google analytics", "trello", "notion", "mixpanel", "tableau", "zendesk"]):
-            puntaje += 15
-
-    if puesto_key == "abogado":
-        if not any(x in texto_lower for x in ["derecho", "abogado", "juridico", "legal", "leyes"]):
-            puntaje = min(puntaje, 35)
-
-    puntaje = int(min(puntaje, 100))
-    resultado = "apto" if puntaje >= 60 else "no_apto"
-
-    explicacion = []
-    explicacion.append("ANÁLISIS INTELIGENTE DEL CURRÍCULUM VITAE")
-    explicacion.append(f"Nombre detectado: {nombre_detectado}.")
-    explicacion.append(f"Correo detectado: {correo}.")
-    explicacion.append(f"Teléfono detectado: {telefono}.")
-    explicacion.append(f"Experiencia estimada: {experiencia} años.")
-    explicacion.append(f"Nivel educativo detectado: {educacion}.")
-
+    explicacion = [
+        'ANÁLISIS INTELIGENTE DEL CURRÍCULUM VITAE',
+        f"Nombre detectado: {nombre_detectado or 'No detectado'}.",
+        f"DNI detectado: {dni_detectado or 'No detectado'}.",
+        f"Correo detectado: {correo or 'No detectado'}.",
+        f"Teléfono detectado: {telefono or 'No detectado'}.",
+        f"Fecha de nacimiento detectada: {fecha_nacimiento or 'No detectada'}.",
+        f"Edad estimada: {str(edad) if edad is not None else 'No detectada'}.",
+        f"Experiencia estimada: {experiencia} años.",
+        f"Nivel educativo detectado: {educacion}.",
+    ]
     if educacion_detectada:
-        explicacion.append("Formación detectada: " + ", ".join(educacion_detectada) + ".")
+        explicacion.append('Formación detectada: ' + ', '.join(educacion_detectada) + '.')
     if idiomas_detectados:
-        explicacion.append("Idiomas detectados: " + ", ".join(idiomas_detectados) + ".")
+        explicacion.append('Idiomas detectados: ' + ', '.join(idiomas_detectados) + '.')
     if certificaciones_detectadas:
-        explicacion.append("Certificaciones detectadas: " + ", ".join(certificaciones_detectadas) + ".")
+        explicacion.append('Certificaciones detectadas: ' + ', '.join(certificaciones_detectadas) + '.')
     if hard_skills_detectadas:
-        explicacion.append("Hard skills detectadas: " + ", ".join(hard_skills_detectadas) + ".")
+        explicacion.append('Hard skills detectadas: ' + ', '.join(hard_skills_detectadas) + '.')
     if experiencia_relevante:
-        explicacion.append("Experiencia relevante detectada: " + ", ".join(experiencia_relevante) + ".")
+        explicacion.append('Experiencia relevante detectada: ' + ', '.join(experiencia_relevante) + '.')
 
-    explicacion.append(f"Compatibilidad con el puesto {perfil.get('nombre', puesto_key)}: {puntaje}%.")
-    if resultado == "apto":
-        explicacion.append(
-            f"Conclusión: APTO para el puesto de {perfil.get('nombre', puesto_key)}, debido a la coincidencia entre experiencia, formación, certificaciones y habilidades del CV."
-        )
+    explicacion.extend([
+        '',
+        'DETALLE DEL PUNTAJE',
+        f'Experiencia: {score_exp}/25.',
+        f'Educación: {score_edu}/20.',
+        f'Habilidades: {score_hab}/25.',
+        f'Certificaciones: {score_cert}/15.',
+        f'Cargos relacionados: {score_cargos}/10.',
+        f'Idiomas: {score_idiomas}/5.',
+        f"Compatibilidad con el puesto {perfil.get('nombre', puesto_key)}: {puntaje}%.",
+        f'Recomendación IA: {recomendacion}.'
+    ])
+
+    if resultado == 'apto':
+        explicacion.append(f"Conclusión: APTO para el puesto de {perfil.get('nombre', puesto_key)}.")
+    elif resultado == 'revisar':
+        explicacion.append(f"Conclusión: REVISAR MANUALMENTE. El perfil tiene coincidencias parciales con {perfil.get('nombre', puesto_key)}.")
     else:
-        explicacion.append(
-            f"Conclusión: NO APTO para el puesto de {perfil.get('nombre', puesto_key)}, porque el CV no evidencia suficientes coincidencias con el perfil requerido."
-        )
+        explicacion.append(f"Conclusión: NO APTO para el puesto de {perfil.get('nombre', puesto_key)}.")
 
     return {
-        "experiencia": experiencia,
-        "educacion": educacion,
-        "habilidades": habilidades,
-        "certificaciones": certificaciones,
-        "puntaje": puntaje,
-        "resultado": resultado,
-        "probabilidad": puntaje / 100,
-        "explicacion": "\n".join(explicacion)
+        'nombre_detectado': nombre_detectado,
+        'dni_detectado': dni_detectado,
+        'correo_detectado': correo,
+        'telefono_detectado': telefono,
+        'fecha_nacimiento': fecha_nacimiento,
+        'edad': edad,
+        'experiencia': experiencia,
+        'educacion': educacion,
+        'habilidades': habilidades,
+        'certificaciones': certificaciones,
+        'puntaje': puntaje,
+        'resultado': resultado,
+        'probabilidad': puntaje / 100,
+        'recomendacion': recomendacion,
+        'explicacion': '\n'.join(explicacion)
     }
+
+
+# ════════════════════════════════════════════════════════════════════
+# CONVOCATORIAS: PLAZO, RANKING Y CORREOS AUTOMÁTICOS
+# ════════════════════════════════════════════════════════════════════
+def cargar_convocatorias():
+    return _leer_json('convocatorias.json', [])
+
+
+def guardar_convocatorias(data):
+    _guardar_json('convocatorias.json', data)
+
+
+def _parse_dt(valor):
+    if not valor:
+        return None
+    for fmt in ['%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M']:
+        try:
+            return datetime.strptime(valor, fmt)
+        except Exception:
+            pass
+    return None
+
+
+def _html_resultado_postulante(nombre, puesto_nombre, seleccionado, puntaje):
+    if seleccionado:
+        titulo = '¡Felicidades! Has sido seleccionado para la siguiente etapa'
+        color = '#1D9E75'
+        cuerpo = f'Tu CV obtuvo el mejor puntaje para el puesto de {puesto_nombre}. Puntaje IA: {puntaje}%.'
+    else:
+        titulo = 'Resultado de evaluación de currículo'
+        color = '#A32D2D'
+        cuerpo = f'Agradecemos tu postulación al puesto de {puesto_nombre}. En esta oportunidad no fuiste seleccionado. Puntaje IA: {puntaje}%.'
+    return f'''
+    <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;border:1px solid #ddd;border-radius:10px;overflow:hidden;">
+      <div style="background:#2E7D4F;color:#fff;padding:18px;text-align:center;">
+        <h2 style="margin:0;">GestiMuni Huánuco</h2>
+        <p style="margin:4px 0 0;font-size:13px;">Evaluación inteligente de currículos</p>
+      </div>
+      <div style="padding:22px;">
+        <h3 style="color:{color};margin-top:0;">{titulo}</h3>
+        <p>Hola <strong>{nombre}</strong>,</p>
+        <p>{cuerpo}</p>
+        <p style="font-size:12px;color:#777;">Este correo fue generado automáticamente por el módulo de IA de GestiMuni.</p>
+      </div>
+    </div>'''
+
+
+def enviar_correo_postulante(postulante, seleccionado, puesto_nombre):
+    if not postulante.email:
+        return False
+    try:
+        asunto = 'Resultado de evaluación de CV'
+        html = _html_resultado_postulante(postulante.nombre, puesto_nombre, seleccionado, postulante.puntaje_ml)
+        msg = Message(
+            subject=f'GestiMuni — {asunto}',
+            sender=f"GestiMuni <{app.config['MAIL_USERNAME']}>",
+            recipients=[postulante.email],
+            html=html
+        )
+        mail.send(msg)
+        return True
+    except Exception as e:
+        print('Error enviando correo a postulante:', e)
+        return False
+
+
+def evaluar_convocatoria_y_enviar(conv):
+    puestos = cargar_puestos()
+    puesto_key = conv.get('puesto')
+    puesto_nombre = puestos.get(puesto_key, {}).get('nombre', puesto_key)
+    inicio = _parse_dt(conv.get('fecha_inicio'))
+    cierre = _parse_dt(conv.get('fecha_cierre'))
+
+    q = Postulante.query.filter_by(puesto=puesto_key)
+    if inicio:
+        q = q.filter(Postulante.fecha_registro >= inicio)
+    if cierre:
+        q = q.filter(Postulante.fecha_registro <= cierre)
+    candidatos = q.order_by(Postulante.puntaje_ml.desc(), Postulante.fecha_registro.asc()).all()
+
+    if not candidatos:
+        conv['estado'] = 'cerrada_sin_postulantes'
+        conv['finalizada'] = True
+        conv['resultado'] = {'mensaje': 'No hubo postulantes dentro del plazo.'}
+        return conv
+
+    mejor = candidatos[0]
+    enviados = []
+    for p in candidatos:
+        seleccionado = (p.id == mejor.id and p.resultado_ml in ['apto', 'revisar'])
+        ok = enviar_correo_postulante(p, seleccionado, puesto_nombre)
+        enviados.append({'postulante_id': p.id, 'email': p.email, 'seleccionado': seleccionado, 'correo_enviado': ok})
+
+    conv['estado'] = 'finalizada'
+    conv['finalizada'] = True
+    conv['resultado'] = {
+        'ganador_id': mejor.id,
+        'ganador_nombre': mejor.nombre,
+        'ganador_puntaje': mejor.puntaje_ml,
+        'total_postulantes': len(candidatos),
+        'correos': enviados,
+        'fecha_evaluacion': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    }
+    registrar_auditoria(
+        f"Finalizó convocatoria {puesto_nombre}. Ganador: {mejor.nombre} ({mejor.puntaje_ml}%).",
+        'Convocatorias'
+    )
+    return conv
+
+
+def procesar_convocatorias_vencidas():
+    if not current_user.is_authenticated or current_user.rol != 'admin':
+        return
+    data = cargar_convocatorias()
+    cambio = False
+    ahora = datetime.now()
+    for conv in data:
+        if conv.get('finalizada'):
+            continue
+        cierre = _parse_dt(conv.get('fecha_cierre'))
+        if cierre and ahora >= cierre:
+            evaluar_convocatoria_y_enviar(conv)
+            cambio = True
+    if cambio:
+        guardar_convocatorias(data)
+
+
+@app.route('/convocatorias')
+@login_required
+@rol_requerido('admin')
+def convocatorias():
+    procesar_convocatorias_vencidas()
+    return render_template('convocatorias.html', convocatorias=cargar_convocatorias(), puestos=cargar_puestos())
+
+
+@app.route('/convocatorias/nueva', methods=['GET', 'POST'])
+@login_required
+@rol_requerido('admin')
+def nueva_convocatoria():
+    puestos = cargar_puestos()
+    if request.method == 'POST':
+        puesto = request.form.get('puesto')
+        duracion_tipo = request.form.get('duracion_tipo', 'dias')
+        duracion = int(request.form.get('duracion', 1))
+        inicio = datetime.now()
+        if duracion_tipo == 'minutos':
+            from datetime import timedelta
+            cierre = inicio + timedelta(minutes=duracion)
+        elif duracion_tipo == 'horas':
+            from datetime import timedelta
+            cierre = inicio + timedelta(hours=duracion)
+        else:
+            from datetime import timedelta
+            cierre = inicio + timedelta(days=duracion)
+
+        data = cargar_convocatorias()
+        conv = {
+            'id': uuid.uuid4().hex[:10],
+            'puesto': puesto,
+            'fecha_inicio': inicio.strftime('%Y-%m-%d %H:%M:%S'),
+            'fecha_cierre': cierre.strftime('%Y-%m-%d %H:%M:%S'),
+            'estado': 'abierta',
+            'finalizada': False,
+            'creado_por': current_user.nombre,
+            'resultado': {}
+        }
+        data.append(conv)
+        guardar_convocatorias(data)
+        registrar_auditoria(f"Creó convocatoria para {puestos.get(puesto, {}).get('nombre', puesto)} hasta {conv['fecha_cierre']}", 'Convocatorias')
+        flash('Convocatoria creada correctamente.', 'success')
+        return redirect(url_for('convocatorias'))
+    return render_template('convocatoria_form.html', puestos=puestos)
+
+
+@app.route('/convocatorias/finalizar/<conv_id>', methods=['POST'])
+@login_required
+@rol_requerido('admin')
+def finalizar_convocatoria(conv_id):
+    data = cargar_convocatorias()
+    for conv in data:
+        if conv.get('id') == conv_id:
+            evaluar_convocatoria_y_enviar(conv)
+            guardar_convocatorias(data)
+            flash('Convocatoria finalizada. Se enviaron correos a los postulantes registrados.', 'success')
+            return redirect(url_for('convocatorias'))
+    flash('Convocatoria no encontrada.', 'danger')
+    return redirect(url_for('convocatorias'))
+
+
+@app.route('/convocatorias/eliminar/<conv_id>', methods=['POST'])
+@login_required
+@rol_requerido('admin')
+def eliminar_convocatoria(conv_id):
+    data = [c for c in cargar_convocatorias() if c.get('id') != conv_id]
+    guardar_convocatorias(data)
+    registrar_auditoria('Eliminó una convocatoria', 'Convocatorias')
+    flash('Convocatoria eliminada.', 'success')
+    return redirect(url_for('convocatorias'))
 
 
 if __name__ == '__main__':

@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}Mi postulación — GestiMuni{% endblock %}
+
+{% block contenido %}
+<div class="container py-4" style="max-width:980px;">
+
+  <div class="row align-items-center mb-4">
+    <div class="col-md-8">
+      <h3 class="fw-bold mb-1">
+        <i class="bi bi-person-badge text-success"></i>
+        Portal del postulante
+      </h3>
+      <p class="text-muted mb-0">
+        Selecciona una convocatoria abierta y sube tu currículum vitae. La municipalidad revisará el resultado y te notificará por correo cuando cierre el plazo.
+      </p>
+    </div>
+    <div class="col-md-4 mt-3 mt-md-0">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body py-3">
+          <div class="small text-muted">Hora actual</div>
+          <div class="fw-bold fs-5 text-success" id="relojPostulante">--:--:--</div>
+          <div class="small text-muted" id="fechaPostulante"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="alert alert-success border-0 shadow-sm">
+    <div class="row g-2">
+      <div class="col-md-4"><strong>Postulante:</strong> {{ current_user.nombre }}</div>
+      <div class="col-md-4"><strong>DNI:</strong> {{ current_user.dni or '—' }}</div>
+      <div class="col-md-4"><strong>Correo:</strong> {{ current_user.email or 'Sin correo' }}</div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-success text-white">
+          <i class="bi bi-cloud-arrow-up"></i>
+          Enviar currículum vitae
+        </div>
+        <div class="card-body p-4">
+
+          {% if convocatorias %}
+          <form method="POST" enctype="multipart/form-data">
+
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Convocatoria disponible</label>
+              <select name="convocatoria_id" class="form-select" required>
+                <option value="">Seleccione una convocatoria</option>
+                {% for c in convocatorias %}
+                  <option value="{{ c.id }}">
+                    {% if puestos.get(c.puesto) %}
+                      {{ puestos[c.puesto].nombre }}
+                    {% else %}
+                      {{ c.puesto }}
+                    {% endif %}
+                    — Cierra: {{ c.fecha_cierre }}
+                  </option>
+                {% endfor %}
+              </select>
+              <div class="form-text">Solo se muestran convocatorias abiertas.</div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Correo de contacto</label>
+              <input type="email" name="email" class="form-control" value="{{ current_user.email or '' }}" required>
+            </div>
+
+            <div class="mb-4">
+              <label class="form-label fw-semibold">Currículum Vitae</label>
+              <input type="file" name="archivo_cv" class="form-control" accept=".pdf,.docx,.txt,.csv" required>
+              <div class="form-text">Formatos permitidos: PDF, DOCX, TXT o CSV.</div>
+            </div>
+
+            <div class="alert alert-info border-0">
+              <i class="bi bi-info-circle"></i>
+              Tu CV será registrado y evaluado internamente. No verás el puntaje IA; recibirás el resultado por correo cuando la convocatoria finalice.
+            </div>
+
+            <button class="btn btn-success">
+              <i class="bi bi-send"></i>
+              Enviar postulación
+            </button>
+          </form>
+          {% else %}
+            <div class="text-center text-muted py-5">
+              <i class="bi bi-calendar-x fs-1 d-block mb-2"></i>
+              <h6 class="fw-bold">No hay convocatorias abiertas</h6>
+              <p class="mb-0">Vuelve a ingresar más tarde o espera una nueva convocatoria publicada por la municipalidad.</p>
+            </div>
+          {% endif %}
+
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-light fw-semibold">
+          <i class="bi bi-calendar-check text-success"></i>
+          Convocatorias abiertas
+        </div>
+        <div class="card-body">
+          {% for c in convocatorias %}
+          <div class="border rounded-3 p-3 mb-3">
+            <div class="fw-bold">
+              {% if puestos.get(c.puesto) %}{{ puestos[c.puesto].nombre }}{% else %}{{ c.puesto }}{% endif %}
+            </div>
+            <div class="small text-muted mt-1">
+              <i class="bi bi-play-circle text-success"></i> Inicio: {{ c.fecha_inicio }}<br>
+              <i class="bi bi-stopwatch text-danger"></i> Cierre: {{ c.fecha_cierre }}
+            </div>
+            <span class="badge bg-success mt-2">Abierta</span>
+          </div>
+          {% else %}
+          <div class="text-muted text-center py-4">Sin convocatorias activas.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mt-4">
+    <div class="card-header bg-light fw-semibold">
+      <i class="bi bi-folder-check"></i>
+      Mis postulaciones
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-success">
+            <tr>
+              <th class="ps-4">Puesto</th>
+              <th>Fecha</th>
+              <th>Estado visible</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in postulaciones %}
+            <tr>
+              <td class="ps-4 fw-semibold">{{ p.puesto.replace('_', ' ').title() }}</td>
+              <td>{{ p.fecha_registro.strftime('%d/%m/%Y %H:%M') }}</td>
+              <td><span class="badge bg-secondary">En evaluación</span></td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="3" class="text-center text-muted py-4">
+                Todavía no enviaste ninguna postulación.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function actualizarRelojPostulante() {
+  const ahora = new Date();
+  document.getElementById('relojPostulante').textContent = ahora.toLocaleTimeString('es-PE', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  document.getElementById('fechaPostulante').textContent = ahora.toLocaleDateString('es-PE', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+}
+actualizarRelojPostulante();
+setInterval(actualizarRelojPostulante, 1000);
+</script>
+{% endblock %}

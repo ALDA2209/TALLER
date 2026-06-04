@@ -53,6 +53,7 @@ class Documento(db.Model):
 class Postulante(db.Model):
     __tablename__ = 'postulantes'
     id              = db.Column(db.Integer, primary_key=True)
+    usuario_id      = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=True)
     nombre          = db.Column(db.String(100), nullable=False)
     dni             = db.Column(db.String(8), nullable=True)
     email           = db.Column(db.String(120), nullable=True)
@@ -67,6 +68,7 @@ class Postulante(db.Model):
     fecha_registro  = db.Column(db.DateTime, default=datetime.utcnow)
     archivo_cv      = db.Column(db.String(255), nullable=True)   # nombre en disco
     texto_cv        = db.Column(db.Text, nullable=True)         # texto extraído del CV
+    usuario         = db.relationship('Usuario', backref='postulaciones')
 
 class Alerta(db.Model):
     __tablename__ = 'alertas'
