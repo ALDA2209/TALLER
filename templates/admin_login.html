@@ -55,7 +55,13 @@
                     </button>
                 </form>
                 {% endif %}
-
+                {% if true %}
+<div class="text-center mt-2">
+    <a href="{{ url_for('admin_registro') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-person-plus"></i> Registrar nuevo admin
+    </a>
+</div>
+{% endif %}
                 <hr>
                 <div class="text-center">
                     <a href="{{ url_for('inicio') }}" class="text-muted" style="font-size:13px;">

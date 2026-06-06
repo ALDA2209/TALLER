@@ -4,9 +4,11 @@
     "puesto": "project_manager",
     "fecha_inicio": "2026-06-04 11:39:53",
     "fecha_cierre": "2026-06-04 12:39:53",
-    "estado": "abierta",
-    "finalizada": false,
+    "estado": "cerrada_sin_postulantes",
+    "finalizada": true,
     "creado_por": "Administrador",
-    "resultado": {}
+    "resultado": {
+      "mensaje": "No hubo postulantes dentro del plazo."
+    }
   }
 ]

@@ -333,6 +333,36 @@ def admin_login():
     return render_template('admin_login.html', paso=1)
 
 
+# ── Registro de nuevo admin ──────────────────────────────────────────
+@app.route('/admin/registro', methods=['GET', 'POST'])
+@login_required
+@rol_requerido('admin')
+def admin_registro():
+    if request.method == 'POST':
+        nombre   = request.form['nombre'].strip()
+        username = request.form['username'].strip()
+        email    = request.form.get('email', '').strip() or None
+        password = request.form['password']
+
+        if Usuario.query.filter_by(username=username).first():
+            flash('El usuario ya existe.', 'danger')
+            return redirect(url_for('admin_registro'))
+
+        usuario = Usuario(
+            nombre=nombre,
+            username=username,
+            password=generate_password_hash(password),
+            rol='admin',
+            email=email
+        )
+        db.session.add(usuario)
+        registrar_auditoria(f'Creó nuevo admin: {nombre}', 'Usuarios')
+        db.session.commit()
+        flash(f'Admin "{username}" creado correctamente.', 'success')
+        return redirect(url_for('dashboard'))
+    return render_template('admin_registro.html')
+
+
 @app.route('/logout')
 @login_required
 def logout():

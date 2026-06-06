@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block contenido %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div style="background:var(--verde-oscuro); padding:1.5rem; border-radius:8px 8px 0 0; text-align:center;">
+                <span class="logo-gm fs-4">GM</span>
+                <h5 class="mt-2 fw-bold text-white">Registrar Administrador</h5>
+                <p style="color:rgba(255,255,255,0.7); font-size:13px;">Solo accesible para admins</p>
+            </div>
+            <div class="card-body p-4">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% for cat, msg in messages %}
+                        <div class="alert alert-{{ cat }}">{{ msg }}</div>
+                    {% endfor %}
+                {% endwith %}
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label"><i class="bi bi-person"></i> Nombre completo</label>
+                        <input type="text" name="nombre" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><i class="bi bi-at"></i> Usuario</label>
+                        <input type="text" name="username" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><i class="bi bi-envelope"></i> Correo</label>
+                        <input type="email" name="email" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><i class="bi bi-lock"></i> Contraseña</label>
+                        <input type="password" name="password" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-institucional w-100">
+                        <i class="bi bi-person-check"></i> Crear administrador
+                    </button>
+                </form>
+                <hr>
+                <div class="text-center">
+                    <a href="{{ url_for('dashboard') }}" class="text-muted" style="font-size:13px;">
+                        <i class="bi bi-arrow-left"></i> Volver al dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
