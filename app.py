@@ -1280,6 +1280,11 @@ def inicializar_bd():
                         password=generate_password_hash('post123'),
                         rol='postulante', email='postulante@gmail.com',
                         dni='11223344'),
+
+                        Usuario(nombre='Aldahir', username='ADMIN',
+                        password=generate_password_hash('ADMIN123'),
+                        rol='admin', email='pasivi22@gmail.com',
+                        dni='71870033'),
             ]
             db.session.add_all(usuarios_default)
             db.session.commit()
