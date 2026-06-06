@@ -12,6 +12,8 @@ GestiMuni es una web app desarrollada con Flask y scikit-learn que automatiza la
 - Sistema de alertas en tiempo real
 - Login ciudadano con registro
 - Panel administrativo con autenticación de 2 pasos (PIN por correo)
+- Registro de nuevos administradores desde el panel admin
+- Correo institucional configurado con Gmail App Password
 - Base de datos SQLite
 
 ## Tecnologías
@@ -27,7 +29,7 @@ git clone https://github.com/ALDA2209/TALLER.git
 cd TALLER
 python3 -m venv venv
 source venv/bin/activate
-pip install flask flask-login flask-sqlalchemy flask-mail scikit-learn pandas numpy
+pip install -r requirements.txt
 python app.py
 ```
 
@@ -36,7 +38,7 @@ python app.py
 - Admin: `http://localhost:5000/admin/login`
 
 ## Usuarios de prueba
-- Admin: `admin` / `admin123`
+- AAdmin: `ADMIN` / `ADMIN123`
 - Ciudadano: `ciudadano1` / `1234`
 
 ## Curso
