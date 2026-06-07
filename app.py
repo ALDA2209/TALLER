@@ -686,7 +686,10 @@ def postulante_panel():
     postulaciones = Postulante.query.filter_by(dni=current_user.dni).order_by(Postulante.fecha_registro.desc()).all()
 
     if request.method == 'POST':
-        puesto_key = request.form.get('puesto', '').strip()
+        convocatoria_id = request.form.get('convocatoria_id', '').strip()
+        abiertas_dict = {c['id']: c for c in abiertas}
+        conv_seleccionada = abiertas_dict.get(convocatoria_id)
+        puesto_key = conv_seleccionada.get('puesto', '') if conv_seleccionada else ''
         email_form = request.form.get('email', '').strip() or current_user.email
         archivo_cv = request.files.get('archivo_cv')
 

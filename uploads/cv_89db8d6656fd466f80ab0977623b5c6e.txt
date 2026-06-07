@@ -1,0 +1,26 @@
+CURRICULUM VITAE
+
+Nombre: Aldahir Ponce
+DNI: 71870038
+Correo: 1202311013@udh.edu.pe
+Teléfono: 921707823
+
+FORMACIÓN ACADÉMICA
+Universidad de Huánuco - Derecho y Ciencias Políticas (En curso)
+SENATI - Ingeniería de Software con IA (En curso)
+
+EXPERIENCIA PROFESIONAL
+2024 - Presente: Desarrollador Web - Proyectos Django
+2023 - 2024: Asistente Administrativo - Gestión de documentos y archivo
+
+HABILIDADES
+- Word, Excel, Redacción
+- Atención al cliente
+- Archivo y gestión documental
+- Python, Django, Flask
+
+IDIOMAS
+- Español (nativo)
+- Inglés (básico)
+
+EXPERIENCIA: 2 años de experiencia en administración y desarrollo web.

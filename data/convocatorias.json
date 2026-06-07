@@ -10,5 +10,65 @@
     "resultado": {
       "mensaje": "No hubo postulantes dentro del plazo."
     }
+  },
+  {
+    "id": "7b5ea143ca",
+    "puesto": "recursos_humanos",
+    "fecha_inicio": "2026-06-06 17:14:53",
+    "fecha_cierre": "2026-06-06 17:19:53",
+    "estado": "cerrada_sin_postulantes",
+    "finalizada": true,
+    "creado_por": "ADMIN",
+    "resultado": {
+      "mensaje": "No hubo postulantes dentro del plazo."
+    }
+  },
+  {
+    "id": "fcab8839a8",
+    "puesto": "asistente_administrativo",
+    "fecha_inicio": "2026-06-06 17:21:28",
+    "fecha_cierre": "2026-06-06 17:26:28",
+    "estado": "cerrada_sin_postulantes",
+    "finalizada": true,
+    "creado_por": "ADMIN",
+    "resultado": {
+      "mensaje": "No hubo postulantes dentro del plazo."
+    }
+  },
+  {
+    "id": "ec23bc1974",
+    "puesto": "abogado",
+    "fecha_inicio": "2026-06-06 17:28:22",
+    "fecha_cierre": "2026-06-06 17:35:22",
+    "estado": "cerrada_sin_postulantes",
+    "finalizada": true,
+    "creado_por": "ADMIN",
+    "resultado": {
+      "mensaje": "No hubo postulantes dentro del plazo."
+    }
+  },
+  {
+    "id": "acbe066d02",
+    "puesto": "contador",
+    "fecha_inicio": "2026-06-06 17:36:52",
+    "fecha_cierre": "2026-06-06 17:46:52",
+    "estado": "cerrada_sin_postulantes",
+    "finalizada": true,
+    "creado_por": "ADMIN",
+    "resultado": {
+      "mensaje": "No hubo postulantes dentro del plazo."
+    }
+  },
+  {
+    "id": "f068db063c",
+    "puesto": "contador",
+    "fecha_inicio": "2026-06-07 09:22:08",
+    "fecha_cierre": "2026-06-07 09:28:08",
+    "estado": "cerrada_sin_postulantes",
+    "finalizada": true,
+    "creado_por": "ADMIN",
+    "resultado": {
+      "mensaje": "No hubo postulantes dentro del plazo."
+    }
   }
 ]
