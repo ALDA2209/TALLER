@@ -686,10 +686,7 @@ def postulante_panel():
     postulaciones = Postulante.query.filter_by(dni=current_user.dni).order_by(Postulante.fecha_registro.desc()).all()
 
     if request.method == 'POST':
-        convocatoria_id = request.form.get('convocatoria_id', '').strip()
-        abiertas_dict = {c['id']: c for c in abiertas}
-        conv_seleccionada = abiertas_dict.get(convocatoria_id)
-        puesto_key = conv_seleccionada.get('puesto', '') if conv_seleccionada else ''
+        puesto_key = request.form.get('puesto', '').strip()
         email_form = request.form.get('email', '').strip() or current_user.email
         archivo_cv = request.files.get('archivo_cv')
 
@@ -752,6 +749,33 @@ def postulante_panel():
         convocatorias=abiertas,
         postulaciones=postulaciones
     )
+
+@app.route('/postulante/actualizar-correo', methods=['POST'])
+@login_required
+@rol_requerido('postulante')
+def postulante_actualizar_correo():
+    nuevo_email = request.form.get('nuevo_email', '').strip()
+    if not nuevo_email or '@' not in nuevo_email:
+        flash('Ingresa un correo valido.', 'warning')
+    else:
+        current_user.email = nuevo_email
+        db.session.commit()
+        flash('Correo actualizado correctamente.', 'success')
+    return redirect(url_for('postulante_panel'))
+
+
+@app.route('/postulante/eliminar/<int:postulacion_id>', methods=['POST'])
+@login_required
+@rol_requerido('postulante')
+def postulante_eliminar(postulacion_id):
+    p = Postulante.query.get_or_404(postulacion_id)
+    if p.dni != current_user.dni:
+        flash('No tienes permiso.', 'danger')
+        return redirect(url_for('postulante_panel'))
+    db.session.delete(p)
+    db.session.commit()
+    flash('Postulacion eliminada.', 'success')
+    return redirect(url_for('postulante_panel'))
 
 @app.route('/curriculos/nuevo', methods=['GET', 'POST'])
 @login_required
@@ -1708,10 +1732,6 @@ def evaluar_convocatoria_y_enviar(conv):
     cierre = _parse_dt(conv.get('fecha_cierre'))
 
     q = Postulante.query.filter_by(puesto=puesto_key)
-    if inicio:
-        q = q.filter(Postulante.fecha_registro >= inicio)
-    if cierre:
-        q = q.filter(Postulante.fecha_registro <= cierre)
     candidatos = q.order_by(Postulante.puntaje_ml.desc(), Postulante.fecha_registro.asc()).all()
 
     if not candidatos:

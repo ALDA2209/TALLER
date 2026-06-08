@@ -47,10 +47,10 @@
 
             <div class="mb-3">
               <label class="form-label fw-semibold">Convocatoria disponible</label>
-              <select name="convocatoria_id" class="form-select" required>
+              <select name="puesto" class="form-select" required>
                 <option value="">Seleccione una convocatoria</option>
                 {% for c in convocatorias %}
-                  <option value="{{ c.id }}">
+                  <option value="{{ c.puesto }}">
                     {% if puestos.get(c.puesto) %}
                       {{ puestos[c.puesto].nombre }}
                     {% else %}
@@ -135,6 +135,7 @@
               <th class="ps-4">Puesto</th>
               <th>Fecha</th>
               <th>Estado visible</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -143,6 +144,7 @@
               <td class="ps-4 fw-semibold">{{ p.puesto.replace('_', ' ').title() }}</td>
               <td>{{ p.fecha_registro.strftime('%d/%m/%Y %H:%M') }}</td>
               <td><span class="badge bg-secondary">En evaluación</span></td>
+              <td><form method="POST" action="/postulante/eliminar/{{ p.id }}" class="d-inline" onsubmit="return confirm('¿Eliminar esta postulacion?');"><button class="btn btn-sm btn-outline-danger">🗑</button></form></td>
             </tr>
             {% else %}
             <tr>
